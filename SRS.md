@@ -181,3 +181,17 @@ The platform provides university students with automated, real-time AI feedback 
 | **US-13** | Course Mgmt | Student Submission Review | **Should-Have** | Backlog |
 | **US-14** | Course Mgmt | Manual Instructor Feedback | **Could-Have** | Backlog |
 | **US-15** | Course Mgmt | Export Class Analytics | **Won't-Have (v1)** | Future Roadmap |
+
+---
+
+## 7. Draft REST API Specifications
+
+| Method | Endpoint | Associated Story | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/auth/register` | US-01 | Студенческая регистрация |
+| `POST` | `/api/v1/auth/login` | US-02 | Вход и выдача JWT токена |
+| `GET` | `/api/v1/topics` | US-04 | Получение списка топиков с фильтрацией |
+| `POST` | `/api/v1/sessions` | US-05 | Создание сессии и загрузка аудиозаписи |
+| `GET` | `/api/v1/sessions/{id}/feedback` | US-08, US-09 | Получение отчета AI по грамматике и произношению |
+| `GET` | `/api/v1/students/progress` | US-11 | Получение истории оценок для графиков |
+| `POST` | `/api/v1/assignments` | US-12 | Создание задания преподавателем |
