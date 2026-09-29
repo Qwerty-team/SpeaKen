@@ -24,3 +24,27 @@ CREATE TABLE IF NOT EXISTS practice_sessions (
     duration_minutes INT,
     feedback TEXT
 );
+
+ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'STUDENT';
+
+CREATE TABLE IF NOT EXISTS audio_recordings (
+    id BIGSERIAL PRIMARY KEY,
+    session_id BIGINT REFERENCES practice_sessions(id) ON DELETE CASCADE,
+    audio_url VARCHAR(500) NOT NULL,
+    transcript TEXT,
+    wpm_rate INT,
+    grammar_score INT,
+    pronunciation_score INT,
+    ai_feedback_json JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS assignments (
+    id BIGSERIAL PRIMARY KEY,
+    instructor_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(200) NOT NULL,
+    prompt_text TEXT NOT NULL,
+    max_duration_seconds INT DEFAULT 180,
+    due_date TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
