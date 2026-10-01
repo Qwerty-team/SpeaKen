@@ -48,3 +48,16 @@ CREATE TABLE IF NOT EXISTS assignments (
     due_date TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+
+CREATE TABLE IF NOT EXISTS assignment_submissions (
+    id BIGSERIAL PRIMARY KEY,
+    assignment_id BIGINT REFERENCES assignments(id) ON DELETE CASCADE,
+    student_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+    audio_recording_id BIGINT REFERENCES audio_recordings(id) ON DELETE SET NULL,
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_topics_title ON topics(title);
+CREATE INDEX IF NOT EXISTS idx_topics_category ON topics(category);
+CREATE INDEX IF NOT EXISTS idx_audio_recordings_session ON audio_recordings(session_id);
