@@ -1,24 +1,36 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const { Pool } = require('pg');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.post('/api/v1/auth/login', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Login successful',
-    token: 'fake-jwt-token-123',
-    user: { email: req.body.email || 'student@university.edu', role: 'student' }
-  });
+const pool = new Pool({
+  user: 'postgres',
+  host: 'localhost',
+  database: 'speaken_db',
+  password: 'Qqwerty!123',
+  port: 5432,
 });
 
-app.get('/api/v1/topics', (req, res) => {
-  res.json([
-    { id: 1, title: 'Job Interview Practice', difficulty: 'Intermediate' },
-    { id: 2, title: 'Daily Conversation & Small Talk', difficulty: 'Beginner' }
-  ]);
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error('❌ ОШИБКА БАЗЫ ДАННЫХ:', err.message);
+  } else {
+    console.log('✅ БАЗА ДАННЫХ ПОДКЛЮЧЕНА УСПЕШНО!');
+  }
+});
+
+app.get('/api/v1/topics', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, title, category, description FROM topics');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('ОШИБКА В /topics:', err.message);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 const PORT = 3000;
@@ -29,6 +41,7 @@ app.get('/', (req, res) => {
     version: '1.0.0'
   });
 });
+
 app.listen(PORT, () => {
   console.log(`Backend server running on http://localhost:${PORT}`);
 });
