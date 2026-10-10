@@ -1,6 +1,12 @@
 # SpeaKen Backend Module
-### Tech stack: Node.js, Express.js, PostgreSQL
 
-### Backend Development Team:
-**Asylbek Dilnaz** — Backend Developer
-**Aliona Joel** — Backend Developer
+**Tech Stack:** `Node.js` | `Express.js` | `PostgreSQL`
+
+---
+
+## Backend Development Team
+```
+* Sharafiyeva Alsu — Database
+* Asylbek Dilnaz — Backend
+* Aliona Joel — Backend
+```
