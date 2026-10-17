@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Overwritten at runtime by SeasonalTheme based on the chosen season,
+     this is just the "autumn" default so there's no flash of unstyled
+     colors before JS runs. */
+  --background: 40 33% 97%;
+  --foreground: 20 15% 15%;
+  --card: 40 30% 99%;
+  --card-foreground: 20 15% 15%;
+  --border: 30 20% 88%;
+  --primary: 25 35% 35%;
+  --primary-foreground: 40 30% 98%;
+  --muted: 35 25% 94%;
+  --muted-foreground: 25 15% 45%;
+  --accent: 25 60% 92%;
+  --accent-foreground: 25 35% 30%;
+  --destructive: 5 75% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --stone-400: 25 10% 65%;
+  --stone-500: 25 10% 50%;
+  --stone-600: 25 10% 40%;
+  --stone-700: 25 10% 30%;
+  --chart-1: 25 35% 35%;
+  --radius: 1rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.font-heading {
+  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+}
