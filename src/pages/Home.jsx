@@ -5,6 +5,7 @@ import PracticeSetup from "@/components/practice/PracticeSetup";
 import ResearchPhase from "@/components/practice/ResearchPhase";
 import PresentationPhase from "@/components/practice/PresentationPhase";
 import EvaluationResults from "@/components/practice/EvaluationResults";
+import TopicList from "@/components/TopicList";
 
 export default function Home() {
   const [stage, setStage] = useState("setup"); // setup | research | presentation | results
@@ -130,7 +131,15 @@ export default function Home() {
         </div>
       )}
 
-      {stage === "setup" && <PracticeSetup onGenerate={handleGenerate} loading={generating} />}
+      {stage === "setup" && (
+        <>
+          <PracticeSetup onGenerate={handleGenerate} loading={generating} />
+          <div className="mx-auto max-w-2xl px-6 pb-10">
+            <h2 className="mb-3 text-lg font-semibold">Topics from database</h2>
+            <TopicList />
+          </div>
+        </>
+      )}
       {stage === "research" && (
         <ResearchPhase session={session} onStart={handleStartPresentation} onNewTopic={handleNewTopic} />
       )}

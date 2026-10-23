@@ -1,5 +1,3 @@
-
-
 const BASE_URL = import.meta.env.VITE_API_URL || "";
 
 const LOCAL_USER_KEY = "speaken_local_user";
@@ -76,6 +74,12 @@ async function request(path, { method = "GET", body, headers = {} } = {}) {
 }
 
 export const api = {
+  topics: {
+    list() {
+      return request("/api/v1/topics");
+    },
+  },
+
   auth: {
     me() {
       if (isLocalMode()) return Promise.resolve(loadLocalUser());
