@@ -7,13 +7,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+
 const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'speaken_db',
-  password: 'пароль',
-  port: 5432,
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
 });
+
 
 pool.query('SELECT NOW()', (err, res) => {
   if (err) {
