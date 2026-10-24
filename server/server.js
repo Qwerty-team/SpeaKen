@@ -11,7 +11,7 @@ const pool = new Pool({
   user: 'postgres',
   host: 'localhost',
   database: 'speaken_db',
-  password: 'Qqwerty!123',
+  password: 'пароль',
   port: 5432,
 });
 
@@ -25,11 +25,40 @@ pool.query('SELECT NOW()', (err, res) => {
 
 app.get('/api/v1/topics', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, title, category, description FROM topics');
+    const result = await pool.query(
+      'SELECT id, title, category, description FROM topics'
+    );
+
     res.json(result.rows);
   } catch (err) {
     console.error('ОШИБКА В /topics:', err.message);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
+  }
+});
+
+app.get('/api/v1/topics/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      'SELECT id, title, category, description FROM topics WHERE id = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Topic not found'
+      });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('ОШИБКА В /topics/:id:', err.message);
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
   }
 });
 
