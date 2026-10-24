@@ -75,10 +75,11 @@ async function request(path, { method = "GET", body, headers = {} } = {}) {
 
 export const api = {
   topics: {
-    list() {
-      return request("/api/v1/topics");
-    },
+  async list() {
+    const data = await request("/api/v1/topics/");
+    return Array.isArray(data) ? data : data.results ?? data.topics ?? [];
   },
+},
 
   auth: {
     me() {
