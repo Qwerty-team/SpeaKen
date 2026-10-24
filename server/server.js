@@ -1,27 +1,75 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
-
-const aiFeedbackRoutes = require('./routes/aiFeedback');
-const courseManagementRoutes = require('./routes/courseManagement');
+const { Pool } = require('pg');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-// Middlewares
 app.use(cors());
 app.use(express.json());
 
-// Routes
-app.use('/api', aiFeedbackRoutes);
-app.use('/api', courseManagementRoutes);
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'UP', timestamp: new Date().toISOString() });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
 });
 
-// Start server
+
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error('❌ ОШИБКА БАЗЫ ДАННЫХ:', err.message);
+  } else {
+    console.log('✅ БАЗА ДАННЫХ ПОДКЛЮЧЕНА УСПЕШНО!');
+  }
+});
+
+app.get('/api/v1/topics', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, title, category, description FROM topics'
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('ОШИБКА В /topics:', err.message);
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
+  }
+});
+
+app.get('/api/v1/topics/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      'SELECT id, title, category, description FROM topics WHERE id = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Topic not found'
+      });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('ОШИБКА В /topics/:id:', err.message);
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
+  }
+});
+
+const PORT = 3000;
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    message: 'English Learning App API is running',
+    version: '1.0.0'
+  });
+});
+
 app.listen(PORT, () => {
-  console.log(`Servidor Express em execução na porta ${PORT}`);
+  console.log(`Backend server running on http://localhost:${PORT}`);
 });
