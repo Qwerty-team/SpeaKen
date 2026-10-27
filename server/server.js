@@ -12,6 +12,25 @@ if (!process.env.JWT_SECRET) {
 
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const { OAuth2Client } = require('google-auth-library');
+
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+const googleCallbackUrl =
+  process.env.GOOGLE_CALLBACK_URL ||
+  'https://speaken.onrender.com/api/auth/google/callback';
+
+const googleOAuthClient =
+  googleClientId && googleClientSecret
+    ? new OAuth2Client(
+        googleClientId,
+        googleClientSecret,
+        googleCallbackUrl
+      )
+    : null;
+
+const frontendUrl = 'https://speakken.netlify.app';
 
 app.use(cors({
   origin: [
@@ -79,6 +98,195 @@ function createAuthToken(user) {
 function setAuthCookie(res, user) {
   res.cookie('speaken_token', createAuthToken(user), authCookieOptions);
 }
+
+function readCookie(req, name) {
+  const cookies = req.headers.cookie || '';
+
+  for (const part of cookies.split(';')) {
+    const separator = part.indexOf('=');
+    if (separator === -1) continue;
+
+    if (part.slice(0, separator).trim() === name) {
+      try {
+        return decodeURIComponent(part.slice(separator + 1).trim());
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  return null;
+}
+
+const oauthCookieOptions = {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'lax',
+  path: '/api/auth/google/callback',
+  maxAge: 10 * 60 * 1000,
+};
+
+app.get('/api/auth/google', (req, res) => {
+  if (!googleOAuthClient) {
+    return res.status(503).json({
+      error: 'Google login is not configured',
+    });
+  }
+
+  const state = crypto.randomBytes(32).toString('hex');
+
+  const requestedPath = req.query.returnTo;
+  const returnTo =
+    typeof requestedPath === 'string' &&
+    requestedPath.startsWith('/') &&
+    !requestedPath.startsWith('//') &&
+    !requestedPath.includes('\\')
+      ? requestedPath
+      : '/';
+
+  res.cookie('speaken_oauth_state', state, oauthCookieOptions);
+  res.cookie(
+    'speaken_oauth_return',
+    encodeURIComponent(returnTo),
+    oauthCookieOptions
+  );
+
+  const url = googleOAuthClient.generateAuthUrl({
+    scope: ['openid', 'email', 'profile'],
+    state,
+    prompt: 'select_account',
+  });
+
+  return res.redirect(url);
+});
+
+app.get('/api/auth/google/callback', async (req, res) => {
+  const stateCookie = readCookie(req, 'speaken_oauth_state');
+  const returnCookie = readCookie(req, 'speaken_oauth_return');
+
+  res.clearCookie('speaken_oauth_state', {
+    ...oauthCookieOptions,
+    maxAge: undefined,
+  });
+  res.clearCookie('speaken_oauth_return', {
+    ...oauthCookieOptions,
+    maxAge: undefined,
+  });
+
+  if (!googleOAuthClient) {
+    return res.status(503).send('Google login is not configured');
+  }
+
+  if (
+    typeof req.query.state !== 'string' ||
+    !stateCookie ||
+    req.query.state !== stateCookie
+  ) {
+    return res.status(400).send('Invalid OAuth state. Please try again.');
+  }
+
+  if (req.query.error || typeof req.query.code !== 'string') {
+    return res.redirect(`${frontendUrl}/login?error=google_login_failed`);
+  }
+
+  try {
+    const { tokens } = await googleOAuthClient.getToken({
+      code: req.query.code,
+      redirect_uri: googleCallbackUrl,
+    });
+
+    if (!tokens.id_token) {
+      throw new Error('Google did not return an ID token');
+    }
+
+    const ticket = await googleOAuthClient.verifyIdToken({
+      idToken: tokens.id_token,
+      audience: googleClientId,
+    });
+
+    const profile = ticket.getPayload();
+
+    if (
+      !profile ||
+      !profile.sub ||
+      !profile.email ||
+      profile.email_verified !== true
+    ) {
+      return res.status(401).send(
+        'Google account email could not be verified.'
+      );
+    }
+
+    const email = profile.email.trim().toLowerCase();
+
+    let result = await pool.query(
+      `SELECT id, email, username, role, created_at
+       FROM users
+       WHERE email = $1`,
+      [email]
+    );
+
+    let user = result.rows[0];
+
+    if (!user) {
+      const baseUsername =
+        (email.split('@')[0]
+          .replace(/[^a-zA-Z0-9_]/g, '_')
+          .slice(0, 40) || 'student');
+
+      let username = baseUsername;
+      let suffix = 1;
+
+      while (true) {
+        const usernameCheck = await pool.query(
+          'SELECT id FROM users WHERE username = $1',
+          [username]
+        );
+
+        if (usernameCheck.rows.length === 0) break;
+
+        suffix += 1;
+        username =
+          `${baseUsername.slice(0, 50 - String(suffix).length - 1)}_${suffix}`;
+      }
+
+      const randomPassword = crypto.randomBytes(32).toString('hex');
+      const passwordHash = await bcrypt.hash(randomPassword, 12);
+
+      result = await pool.query(
+        `INSERT INTO users (username, email, password_hash, role)
+         VALUES ($1, $2, $3, 'STUDENT')
+         RETURNING id, email, username, role, created_at`,
+        [username, email, passwordHash]
+      );
+
+      user = result.rows[0];
+    }
+
+    setAuthCookie(res, user);
+
+    let returnTo = '/';
+    if (returnCookie) {
+      try {
+        const decoded = decodeURIComponent(returnCookie);
+        if (
+          decoded.startsWith('/') &&
+          !decoded.startsWith('//') &&
+          !decoded.includes('\\')
+        ) {
+          returnTo = decoded;
+        }
+      } catch {
+        // Оставляем безопасный адрес по умолчанию.
+      }
+    }
+
+    return res.redirect(`${frontendUrl}${returnTo}`);
+  } catch (err) {
+    console.error('GOOGLE AUTH ERROR:', err.message);
+    return res.redirect(`${frontendUrl}/login?error=google_login_failed`);
+  }
+});
 
 function publicUser(user) {
   return {
