@@ -502,6 +502,9 @@ app.get('/api/v1/topics/:id', async (req, res) => {
   }
 });
 
+// Sessions, topic generation, upload, profile edit (see demoRoutes.js)
+app.use(require('./demoRoutes')({ pool, requireAuth }));
+
 const PORT = process.env.PORT || 3000;
 app.get('/', (req, res) => {
   res.json({
