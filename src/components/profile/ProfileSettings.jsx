@@ -4,7 +4,7 @@ import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useSeasonalTheme } from "@/context/SeasonalTheme";
 
-const LANGUAGES = ["English", "Spanish", "French", "German", "Russian", "Kazakh"];
+const LANGUAGES = ["English","German"];
 
 function useLocalToggle(key, defaultValue) {
   const [value, setValue] = useState(() => {
