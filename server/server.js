@@ -117,14 +117,6 @@ function readCookie(req, name) {
   return null;
 }
 
-const oauthCookieOptions = {
-  httpOnly: true,
-  secure: true,
-  sameSite: 'none',
-  path: '/api/auth/google/callback',
-  maxAge: 10 * 60 * 1000,
-};
-
 app.get('/api/auth/google', (req, res) => {
   if (!googleOAuthClient) {
     return res.status(503).json({
