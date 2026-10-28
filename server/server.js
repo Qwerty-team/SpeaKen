@@ -52,14 +52,13 @@ const pool = new Pool({
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-const authCookieOptions = {
+const oauthCookieOptions = {
   httpOnly: true,
-  secure: isProduction,
-  sameSite: isProduction ? 'none' : 'lax',
+  secure: true,
+  sameSite: 'lax',
   path: '/',
-  maxAge: 7 * 24 * 60 * 60 * 1000,
+  maxAge: 10 * 60 * 1000,
 };
-
 const authCookieClearOptions = {
   httpOnly: true,
   secure: isProduction,
