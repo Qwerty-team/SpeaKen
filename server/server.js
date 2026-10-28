@@ -52,13 +52,14 @@ const pool = new Pool({
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-const oauthCookieOptions = {
+const authCookieOptions = {
   httpOnly: true,
-  secure: true,
-  sameSite: 'lax',
+  secure: isProduction,
+  sameSite: isProduction ? 'none' : 'lax',
   path: '/',
-  maxAge: 10 * 60 * 1000,
+  maxAge: 7 * 24 * 60 * 60 * 1000,
 };
+
 const authCookieClearOptions = {
   httpOnly: true,
   secure: isProduction,
@@ -117,6 +118,14 @@ function readCookie(req, name) {
   return null;
 }
 
+const oauthCookieOptions = {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'lax',
+  path: '/api/auth/google/callback',
+  maxAge: 10 * 60 * 1000,
+};
+
 app.get('/api/auth/google', (req, res) => {
   if (!googleOAuthClient) {
     return res.status(503).json({
@@ -138,7 +147,7 @@ app.get('/api/auth/google', (req, res) => {
   res.cookie('speaken_oauth_state', state, oauthCookieOptions);
   res.cookie(
     'speaken_oauth_return',
-    returnTo,
+    encodeURIComponent(returnTo),
     oauthCookieOptions
   );
 
@@ -159,7 +168,6 @@ app.get('/api/auth/google/callback', async (req, res) => {
     ...oauthCookieOptions,
     maxAge: undefined,
   });
-
   res.clearCookie('speaken_oauth_return', {
     ...oauthCookieOptions,
     maxAge: undefined,
@@ -168,12 +176,6 @@ app.get('/api/auth/google/callback', async (req, res) => {
   if (!googleOAuthClient) {
     return res.status(503).send('Google login is not configured');
   }
-
-  console.log('OAuth state debug:', {
-    hasStateCookie: Boolean(stateCookie),
-    hasQueryState: typeof req.query.state === 'string',
-    stateMatches: stateCookie === req.query.state,
-  });
 
   if (
     typeof req.query.state !== 'string' ||
