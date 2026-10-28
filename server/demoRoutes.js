@@ -1,16 +1,4 @@
-// demoRoutes.js — routes the frontend needs that server.js does not have yet:
-//   PATCH /api/auth/me                      — edit profile
-//   GET/POST /api/sessions, GET/PATCH /api/sessions/:id — practice sessions
-//   POST /api/functions/generateTopic       — picks a topic from the database
-//   POST /api/functions/analyzePresentation — DEMO scoring (no real AI yet)
-//   POST /api/upload, GET /uploads/<file>   — recorded audio/video
-//   GET /api/health                         — database check
-//
-// Connect it in server.js with ONE line, just before `const PORT = ...`:
-//   app.use(require('./demoRoutes')({ pool, requireAuth }));
-//
-// It reuses the existing pool and requireAuth (which sets req.user).
-// Missing database columns are added automatically on start (safe to repeat).
+
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
@@ -87,7 +75,6 @@ const MIME_EXT = {
   'audio/wav': '.wav', 'audio/mp4': '.m4a', 'video/mp4': '.mp4',
 };
 
-// ---------- helpers ----------
 function serializeSession(row) {
   const out = { ...row, id: String(row.id), created_date: row.session_date };
   for (const k of NUMERIC_OUT) out[k] = row[k] === null || row[k] === undefined ? null : Number(row[k]);
@@ -131,8 +118,6 @@ function publicProfile(u) {
     role: u.role,
   };
 }
-
-// Returns { contentType, data } of the first file in a multipart body, or null.
 function extractFile(body, contentTypeHeader) {
   const match = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentTypeHeader || '');
   if (!match) return null;
@@ -156,8 +141,6 @@ function extractFile(body, contentTypeHeader) {
   }
   return null;
 }
-
-// Deterministic pseudo-random number in [0, 1): same recording -> same score.
 function seeded(seedText, salt) {
   let h = 2166136261;
   for (const ch of `${seedText}:${salt}`) {
@@ -166,8 +149,6 @@ function seeded(seedText, salt) {
   }
   return ((h >>> 0) % 1000) / 1000;
 }
-
-// TODO(AI): replace with a real Speech-to-Text + NLP provider (call it asynchronously, SRS §5).
 function demoAnalysis({ audio_url = '', speaking_duration_seconds = 0, evaluation_scale = '100-point', topic = '' }) {
   const seconds = Number(speaking_duration_seconds) || 0;
   const scale = evaluation_scale === 'ielts' ? 'ielts' : '100-point';
@@ -243,15 +224,12 @@ function demoAnalysis({ audio_url = '', speaking_duration_seconds = 0, evaluatio
     overall_score: parts.content_score + parts.fluency_score + parts.vocabulary_score + parts.grammar_score,
   };
 }
-
-// ---------- router ----------
 module.exports = function demoRoutes({ pool, requireAuth }) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
   const ready = pool
     .query(MIGRATION)
-    .then(() => console.log('✅ demoRoutes: database columns are up to date'))
-    .catch((err) => console.error('❌ demoRoutes migration failed:', err.message));
+    
 
   const router = express.Router();
   const uid = (req) => req.user.id;
@@ -270,8 +248,6 @@ module.exports = function demoRoutes({ pool, requireAuth }) {
     await pool.query('SELECT 1');
     res.json({ status: 'ok', database: 'connected' });
   }));
-
-  // ----- profile -----
   router.patch('/api/auth/me', requireAuth, wrap(async (req, res) => {
     const fields = PROFILE_FIELDS.filter((k) => req.body && req.body[k] !== undefined);
     let row;
@@ -287,8 +263,6 @@ module.exports = function demoRoutes({ pool, requireAuth }) {
     }
     res.json(publicProfile(row));
   }));
-
-  // ----- sessions -----
   router.get('/api/sessions', requireAuth, wrap(async (req, res) => {
     const params = [uid(req)];
     let where = 'user_id = $1';
@@ -345,12 +319,9 @@ module.exports = function demoRoutes({ pool, requireAuth }) {
     if (!rows[0]) return res.status(404).json({ error: 'Session not found' });
     res.json(serializeSession(rows[0]));
   }));
-
-  // ----- functions -----
   router.post('/api/functions/generateTopic', requireAuth, wrap(async (req, res) => {
     const category = req.body?.category && req.body.category !== 'Random' ? String(req.body.category) : null;
     const difficulty = DIFFICULTIES.includes(req.body?.difficulty) ? req.body.difficulty : null;
-    // Strictest match first, then relax the filters so the user always gets a topic.
     const attempts = [[category, difficulty], [category, null], [null, difficulty], [null, null]];
     let topic = null;
     for (const [cat, diff] of attempts) {
@@ -386,8 +357,6 @@ module.exports = function demoRoutes({ pool, requireAuth }) {
   router.post('/api/functions/analyzePresentation', requireAuth, wrap(async (req, res) => {
     res.json(demoAnalysis(req.body || {}));
   }));
-
-  // ----- upload -----
   router.post(
     '/api/upload',
     requireAuth,
@@ -398,8 +367,6 @@ module.exports = function demoRoutes({ pool, requireAuth }) {
       if (!file || file.data.length === 0) return res.status(400).json({ error: 'No file uploaded' });
       const name = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${MIME_EXT[file.contentType] || '.webm'}`;
       fs.writeFileSync(path.join(UPLOAD_DIR, name), file.data);
-      // Relative URL: works through the Netlify /uploads proxy and locally.
-      // NOTE: Render's free disk is temporary — files disappear after a restart (fine for a demo).
       res.status(201).json({ file_url: `/uploads/${name}` });
     })
   );
