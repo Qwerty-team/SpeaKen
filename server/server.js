@@ -121,7 +121,7 @@ function readCookie(req, name) {
 const oauthCookieOptions = {
   httpOnly: true,
   secure: true,
-  sameSite: 'lax',
+  sameSite: 'none',
   path: '/api/auth/google/callback',
   maxAge: 10 * 60 * 1000,
 };
@@ -147,7 +147,7 @@ app.get('/api/auth/google', (req, res) => {
   res.cookie('speaken_oauth_state', state, oauthCookieOptions);
   res.cookie(
     'speaken_oauth_return',
-    encodeURIComponent(returnTo),
+    returnTo,
     oauthCookieOptions
   );
 
@@ -168,6 +168,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
     ...oauthCookieOptions,
     maxAge: undefined,
   });
+
   res.clearCookie('speaken_oauth_return', {
     ...oauthCookieOptions,
     maxAge: undefined,
@@ -176,6 +177,12 @@ app.get('/api/auth/google/callback', async (req, res) => {
   if (!googleOAuthClient) {
     return res.status(503).send('Google login is not configured');
   }
+
+  console.log('OAuth state debug:', {
+    hasStateCookie: Boolean(stateCookie),
+    hasQueryState: typeof req.query.state === 'string',
+    stateMatches: stateCookie === req.query.state,
+  });
 
   if (
     typeof req.query.state !== 'string' ||
