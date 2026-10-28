@@ -3,7 +3,7 @@ import { Sparkles, Globe, BarChart3, Clock, Mic, ArrowRight, Loader2 } from "luc
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 
-const LANGUAGES = ["English", "Spanish", "French", "German", "Russian", "Kazakh"];
+const LANGUAGES = ["English","German"];
 const CATEGORIES = [
   "Random",
   "Business",
