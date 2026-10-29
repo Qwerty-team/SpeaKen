@@ -195,3 +195,12 @@ The platform provides university students with automated, real-time AI feedback 
 | `GET` | `/api/v1/sessions/{id}/feedback` | US-08, US-09 | Получение отчета AI по грамматике и произношению |
 | `GET` | `/api/v1/students/progress` | US-11 | Получение истории оценок для графиков |
 | `POST` | `/api/v1/assignments` | US-12 | Создание задания преподавателем |
+
+
+## Ai agentas 
+* **Azure Ai - for rating the pronunciation and frequency of the speech
+* **Gemini - for giving personalized feedback, vocabulary and grammar check
+
+
+## Sources Materials 
+* **English resources - https://link.springer.com/
