@@ -198,9 +198,10 @@ The platform provides university students with automated, real-time AI feedback 
 
 
 ## Ai agentas 
-* **Azure Ai - for rating the pronunciation and frequency of the speech
-* **Gemini - for giving personalized feedback, vocabulary and grammar check
+* **Azure Ai** - for rating the pronunciation and frequency of the speech
+* **Gemini** - for giving personalized feedback, vocabulary and grammar check
 
 
 ## Sources Materials 
-* **English resources - https://link.springer.com/
+* **English** resources - https://link.springer.com/
+* **German** resources - https://lingua.com/german/reading/
