@@ -164,6 +164,16 @@ app.get('/api/auth/google/callback', async (req, res) => {
   const stateCookie = readCookie(req, 'speaken_oauth_state');
   const returnCookie = readCookie(req, 'speaken_oauth_return');
 
+    console.log('OAuth state debug:', {
+    hasStateCookie: Boolean(stateCookie),
+    hasQueryState: typeof req.query.state === 'string',
+    stateMatches: Boolean(
+      stateCookie &&
+      typeof req.query.state === 'string' &&
+      req.query.state === stateCookie
+    ),
+  });
+
   res.clearCookie('speaken_oauth_state', {
     ...oauthCookieOptions,
     maxAge: undefined,
