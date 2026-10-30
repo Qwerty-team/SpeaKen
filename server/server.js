@@ -122,7 +122,7 @@ const oauthCookieOptions = {
   httpOnly: true,
   secure: true,
   sameSite: 'lax',
-  path: '/api/auth/google/callback',
+  path: '/',
   maxAge: 10 * 60 * 1000,
 };
 
