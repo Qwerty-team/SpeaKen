@@ -87,6 +87,21 @@ async function sendEmail({ to, subject, html }) {
   return data;
 }
 
+app.get('/api/test-email', async (req, res) => {
+  try {
+    await sendEmail({
+      to: 'ТВОЙ_EMAIL',
+      subject: 'SpeaKen email test',
+      html: '<h1>Email works!</h1><p>Resend is connected.</p>',
+    });
+
+    res.json({ success: true, message: 'Email sent!' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Email sending failed' });
+  }
+});
+
 function getTokenFromCookie(req) {
   const cookies = req.headers.cookie || '';
 
