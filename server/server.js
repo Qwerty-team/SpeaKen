@@ -90,7 +90,7 @@ async function sendEmail({ to, subject, html }) {
 app.get('/api/test-email', async (req, res) => {
   try {
     await sendEmail({
-      to: 'ТВОЙ_EMAIL',
+      to: 'dasylbek530@gmail.com',
       subject: 'SpeaKen email test',
       html: '<h1>Email works!</h1><p>Resend is connected.</p>',
     });
