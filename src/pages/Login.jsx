@@ -23,7 +23,6 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      // Try the hardcoded local account first — no backend needed for this.
       if (loginLocal(email, password)) {
         window.location.href = returnTo;
         return;
