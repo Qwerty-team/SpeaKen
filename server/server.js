@@ -283,16 +283,32 @@ app.get('/api/auth/google/callback', async (req, res) => {
       const randomPassword = crypto.randomBytes(32).toString('hex');
       const passwordHash = await bcrypt.hash(randomPassword, 12);
 
-      result = await pool.query(
-        `INSERT INTO users (username, email, password_hash, role)
-         VALUES ($1, $2, $3, 'STUDENT')
-         RETURNING id, email, username, role, created_at`,
-        [username, email, passwordHash]
-      );
+     result = await pool.query(
+      `INSERT INTO users (
+        username,
+        email,
+        password_hash,
+        role,
+        email_verified,
+        email_verified_at
+      )
+      VALUES ($1, $2, $3, 'STUDENT', TRUE, NOW())
+      RETURNING id, email, username, role, created_at`,
+      [username, email, passwordHash]
+    );
 
       user = result.rows[0];
     }
-
+    if (user) {
+      await pool.query(
+        `UPDATE users
+         SET email_verified = TRUE,
+             email_verified_at = COALESCE(email_verified_at, NOW())
+         WHERE id = $1`,
+        [user.id]
+      );
+    }
+    
     setAuthCookie(res, user);
 
     let returnTo = '/';
@@ -366,7 +382,10 @@ async function requireAuth(req, res, next) {
 }
 
 app.post('/api/auth/register', async (req, res) => {
+  const client = await pool.connect();
+
   try {
+    let transactionStarted = false;
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = req.body.password;
 
@@ -390,7 +409,7 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
 
-    const emailCheck = await pool.query(
+    const emailCheck = await client.query(
       'SELECT id FROM users WHERE email = $1',
       [email]
     );
@@ -401,16 +420,16 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
 
-
     const baseUsername =
-      email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 40)
-      || 'student';
+      email.split('@')[0]
+        .replace(/[^a-zA-Z0-9_]/g, '_')
+        .slice(0, 40) || 'student';
 
     let username = baseUsername;
     let suffix = 1;
 
     while (true) {
-      const check = await pool.query(
+      const check = await client.query(
         'SELECT id FROM users WHERE username = $1',
         [username]
       );
@@ -423,18 +442,78 @@ app.post('/api/auth/register', async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 12);
 
-    const result = await pool.query(
-      `INSERT INTO users (username, email, password_hash, role)
-       VALUES ($1, $2, $3, 'STUDENT')
-       RETURNING id, email, username, role, created_at`,
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(verificationToken)
+      .digest('hex');
+
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await client.query('BEGIN');
+    
+
+    const result = await client.query(
+      `INSERT INTO users (
+        username,
+        email,
+        password_hash,
+        role,
+        email_verified
+      )
+      VALUES ($1, $2, $3, 'STUDENT', FALSE)
+      RETURNING id`,
       [username, email, passwordHash]
     );
 
-    const user = result.rows[0];
-    setAuthCookie(res, user);
+    const userId = result.rows[0].id;
 
-    return res.status(201).json({ user: publicUser(user) });
+    await client.query(
+      `INSERT INTO email_verification_tokens
+       (user_id, token_hash, expires_at)
+       VALUES ($1, $2, $3)`,
+      [userId, tokenHash, expiresAt]
+    );
+
+    await client.query('COMMIT');
+
+    const verificationLink =
+      `${frontendUrl}/api/auth/verify-email?token=${verificationToken}`;
+
+    try {
+      await sendEmail({
+        to: email,
+        subject: 'Verify your SpeaKen account',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
+            <h2>Welcome to SpeaKen!</h2>
+            <p>Thank you for registering.</p>
+            <p>Please click the button below to verify your email address.</p>
+            <a href="${verificationLink}"
+               style="display:inline-block;padding:12px 24px;background:#2563eb;color:white;text-decoration:none;border-radius:6px;">
+              Verify Email
+            </a>
+            <p>This link expires in 24 hours.</p>
+          </div>
+        `,
+      });
+    } catch (emailError) {
+      console.error('VERIFICATION EMAIL ERROR:', emailError.message);
+
+      return res.status(503).json({
+        error: 'Account created, but verification email could not be sent. Please contact support.',
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Registration successful. Please check your email to verify your account.',
+    });
+
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+
     if (err.code === '23505') {
       return res.status(409).json({
         error: 'Email or username is already registered',
@@ -442,7 +521,87 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     console.error('REGISTER ERROR:', err.message);
-    return res.status(500).json({ error: 'Internal Server Error' });
+
+    return res.status(500).json({
+      error: 'Internal Server Error',
+    });
+
+  } finally {
+    client.release();
+  }
+});
+
+app.get('/api/auth/verify-email', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const token = String(req.query.token || '');
+
+    if (!/^[a-f0-9]{64}$/i.test(token)) {
+      return res.status(400).send('Invalid verification link.');
+    }
+
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    await client.query('BEGIN');
+
+    const tokenResult = await client.query(
+      `SELECT id, user_id
+       FROM email_verification_tokens
+       WHERE token_hash = $1
+         AND expires_at > NOW()
+       FOR UPDATE`,
+      [tokenHash]
+    );
+
+    if (tokenResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+
+      return res.status(400).send(
+        'Verification link is invalid or expired.'
+      );
+    }
+
+    const verification = tokenResult.rows[0];
+
+    await client.query(
+      `UPDATE users
+       SET email_verified = TRUE,
+           email_verified_at = NOW()
+       WHERE id = $1`,
+      [verification.user_id]
+    );
+
+    await client.query(
+      `DELETE FROM email_verification_tokens
+       WHERE id = $1`,
+      [verification.id]
+    );
+
+    await client.query('COMMIT');
+
+    return res.send(`
+      <html>
+        <body style="font-family:Arial;text-align:center;padding:50px;">
+          <h1>Email verified successfully!</h1>
+          <p>Your SpeaKen account is now verified.</p>
+          <a href="${frontendUrl}/login">Go to Login</a>
+        </body>
+      </html>
+    `);
+
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+
+    console.error('EMAIL VERIFICATION ERROR:', err.message);
+
+    return res.status(500).send('Internal Server Error');
+
+  } finally {
+    client.release();
   }
 });
 
@@ -452,27 +611,45 @@ app.post('/api/auth/login', async (req, res) => {
     const password = req.body.password;
 
     if (typeof password !== 'string' || !email) {
-      return res.status(400).json({ error: 'Email and password are required' });
+      return res.status(400).json({
+        error: 'Email and password are required',
+      });
     }
 
     const result = await pool.query(
-      `SELECT id, email, username, password_hash, role, created_at
-       FROM users WHERE email = $1`,
+      `SELECT id, email, username, password_hash,
+              role, created_at, email_verified
+       FROM users
+       WHERE email = $1`,
       [email]
     );
 
     const user = result.rows[0];
 
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({
+        error: 'Invalid email or password',
+      });
+    }
+
+    if (!user.email_verified) {
+      return res.status(403).json({
+        error: 'Please verify your email before logging in.',
+      });
     }
 
     setAuthCookie(res, user);
 
-    return res.json({ user: publicUser(user) });
+    return res.json({
+      user: publicUser(user),
+    });
+
   } catch (err) {
     console.error('LOGIN ERROR:', err.message);
-    return res.status(500).json({ error: 'Internal Server Error' });
+
+    return res.status(500).json({
+      error: 'Internal Server Error',
+    });
   }
 });
 
