@@ -452,7 +452,7 @@ app.post('/api/auth/register', async (req, res) => {
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     await client.query('BEGIN');
-    
+    transactionStarted = true;
 
     const result = await client.query(
       `INSERT INTO users (
@@ -477,9 +477,10 @@ app.post('/api/auth/register', async (req, res) => {
     );
 
     await client.query('COMMIT');
+    transactionStarted = false;
 
     const verificationLink =
-      `${frontendUrl}/api/auth/verify-email?token=${verificationToken}`;
+      `https://speaken.onrender.com/api/auth/verify-email?token=${verificationToken}`;
 
     try {
       await sendEmail({
@@ -512,7 +513,9 @@ app.post('/api/auth/register', async (req, res) => {
     });
 
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
+    if (transactionStarted) {
+      await client.query('ROLLBACK').catch(() => {});
+    }
 
     if (err.code === '23505') {
       return res.status(409).json({
