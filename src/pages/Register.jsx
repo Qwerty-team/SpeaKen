@@ -28,8 +28,7 @@ export default function Register() {
     setLoading(true);
     try {
       await api.auth.register(email, password);
-      await refresh();
-      window.location.href = returnTo;
+      window.location.href = "/login";
     } catch (err) {
       setError(err.message || "Registration failed");
     } finally {
