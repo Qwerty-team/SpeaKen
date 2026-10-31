@@ -499,7 +499,7 @@ app.post('/api/auth/register', async (req, res) => {
           </div>
         `,
       });
-    } } catch (emailError) {
+    } catch (emailError) {
           console.error('VERIFICATION EMAIL ERROR:', {
             message: emailError?.message,
             statusCode: emailError?.statusCode,
