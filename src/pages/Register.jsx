@@ -17,7 +17,6 @@ export default function Register() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const returnTo = safeReturnTo();
-  const { refresh } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
