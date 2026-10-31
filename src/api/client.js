@@ -84,11 +84,11 @@ export const api = {
   auth: {
     resetPassword(token, password) {
       if (isLocalMode()) return Promise.resolve({ ok: true });
-      return request("/api/v1/auth/reset-password", { method: "POST", body: { token, password } });
+      return request("/api/auth/reset-password", { method: "POST", body: { token, password } });
     },
     requestPasswordReset(email) {
       if (isLocalMode()) return Promise.resolve({ ok: true });
-      return request("/api/v1/auth/forgot-password", { method: "POST", body: { email } });
+      return request("/api/auth/forgot-password", { method: "POST", body: { email } });
     },
     me() {
       if (isLocalMode()) return Promise.resolve(loadLocalUser());
