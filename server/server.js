@@ -499,17 +499,9 @@ app.post('/api/auth/register', async (req, res) => {
           </div>
         `,
       });
-    } catch (emailError) {
-          console.error('VERIFICATION EMAIL ERROR:', {
-            message: emailError?.message,
-            statusCode: emailError?.statusCode,
-            name: emailError?.name,
-          });
-  
-          return res.status(503).json({
-            error: 'Account created, but verification email could not be sent. Please contact support.',
-          });
-        }
+    } } catch (emailError) {
+        console.error('VERIFICATION EMAIL ERROR:', emailError);
+      }
 
     return res.status(201).json({
       success: true,
@@ -611,6 +603,194 @@ app.get('/api/auth/verify-email', async (req, res) => {
     client.release();
   }
 });
+
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase();
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 100) {
+    return res.status(400).json({
+      error: 'Please provide a valid email',
+    });
+  }
+
+  let tokenHash;
+
+  try {
+    const result = await pool.query(
+      'SELECT id, email FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({
+        success: true,
+        message: 'If an account exists, a reset link will be sent.',
+      });
+    }
+
+    const user = result.rows[0];
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+
+    tokenHash = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+    await pool.query(
+      `UPDATE password_reset_tokens
+       SET used_at = NOW()
+       WHERE user_id = $1 AND used_at IS NULL`,
+      [user.id]
+    );
+
+    await pool.query(
+      `INSERT INTO password_reset_tokens
+       (user_id, token_hash, expires_at)
+       VALUES ($1, $2, $3)`,
+      [user.id, tokenHash, expiresAt]
+    );
+
+    const resetLink =
+      `${frontendUrl}/reset-password?token=${resetToken}`;
+
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'Reset your SpeaKen password',
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;">
+            <h2>Reset your SpeaKen password</h2>
+            <p>We received a request to reset your password.</p>
+            <p>
+              <a href="${resetLink}"
+                 style="display:inline-block;padding:12px 22px;background:#7A5C40;color:white;text-decoration:none;border-radius:6px;">
+                Reset password
+              </a>
+            </p>
+            <p>This link expires in 30 minutes.</p>
+            <p>If you did not request this, ignore this email.</p>
+          </div>
+        `,
+      });
+    } catch (emailError) {
+      console.error('PASSWORD RESET EMAIL ERROR:', emailError);
+
+      await pool.query(
+        `UPDATE password_reset_tokens
+         SET used_at = NOW()
+         WHERE token_hash = $1`,
+        [tokenHash]
+      );
+    }
+
+    return res.json({
+      success: true,
+      message: 'If an account exists, a reset link will be sent.',
+    });
+
+  } catch (err) {
+    console.error('FORGOT PASSWORD ERROR:', err);
+
+    return res.status(500).json({
+      error: 'Internal Server Error',
+    });
+  }
+});
+
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  const token = String(req.body.token || '');
+  const password = req.body.password;
+
+  if (!/^[a-f0-9]{64}$/i.test(token)) {
+    return res.status(400).json({
+      error: 'Invalid or expired reset link',
+    });
+  }
+
+  if (typeof password !== 'string' || password.length < 8) {
+    return res.status(400).json({
+      error: 'Password must be at least 8 characters',
+    });
+  }
+
+  if (Buffer.byteLength(password, 'utf8') > 72) {
+    return res.status(400).json({
+      error: 'Password is too long',
+    });
+  }
+
+  const client = await pool.connect();
+
+  try {
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    await client.query('BEGIN');
+
+    const tokenResult = await client.query(
+      `SELECT id, user_id
+       FROM password_reset_tokens
+       WHERE token_hash = $1
+         AND expires_at > NOW()
+         AND used_at IS NULL
+       FOR UPDATE`,
+      [tokenHash]
+    );
+
+    if (tokenResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+
+      return res.status(400).json({
+        error: 'Reset link is invalid or expired',
+      });
+    }
+
+    const resetRecord = tokenResult.rows[0];
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    await client.query(
+      `UPDATE users
+       SET password_hash = $1
+       WHERE id = $2`,
+      [passwordHash, resetRecord.user_id]
+    );
+
+    await client.query(
+      `UPDATE password_reset_tokens
+       SET used_at = NOW()
+       WHERE user_id = $1 AND used_at IS NULL`,
+      [resetRecord.user_id]
+    );
+
+    await client.query('COMMIT');
+
+    return res.json({
+      success: true,
+      message: 'Password has been reset successfully',
+    });
+
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+
+    console.error('RESET PASSWORD ERROR:', err);
+
+    return res.status(500).json({
+      error: 'Internal Server Error',
+    });
+
+  } finally {
+    client.release();
+  }
+});
+
 
 app.post('/api/auth/login', async (req, res) => {
   try {
