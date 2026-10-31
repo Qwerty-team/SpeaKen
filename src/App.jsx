@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "@/context/Auth";
 
 import Login from "@/pages/Login";
 import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 import Register from "@/pages/Register";
 import Home from "@/pages/Home";
 import History from "@/pages/History";
@@ -39,6 +40,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/register" element={<Register />} />
             <Route
               path="/"
