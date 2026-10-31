@@ -639,11 +639,13 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
+        /*
     if (!user.email_verified) {
       return res.status(403).json({
-        error: 'Please verify your email before logging in.',
+        message: 'Please verify your email before logging in.'
       });
     }
+    */
 
     setAuthCookie(res, user);
 
