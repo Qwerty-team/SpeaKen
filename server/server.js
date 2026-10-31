@@ -79,10 +79,10 @@ async function sendEmail({ to, subject, html }) {
     html,
   });
 
-  if (error) {
-    console.error('Resend error:', error);
-    throw new Error('Failed to send email');
-  }
+    if (error) {
+      console.error('Resend error details:', error);
+      throw error;
+    }
 
   return data;
 }
@@ -499,13 +499,17 @@ app.post('/api/auth/register', async (req, res) => {
           </div>
         `,
       });
-    } catch (emailError) {
-      console.error('VERIFICATION EMAIL ERROR:', emailError.message);
-
-      return res.status(503).json({
-        error: 'Account created, but verification email could not be sent. Please contact support.',
-      });
-    }
+    } } catch (emailError) {
+          console.error('VERIFICATION EMAIL ERROR:', {
+            message: emailError?.message,
+            statusCode: emailError?.statusCode,
+            name: emailError?.name,
+          });
+  
+          return res.status(503).json({
+            error: 'Account created, but verification email could not be sent. Please contact support.',
+          });
+        }
 
     return res.status(201).json({
       success: true,
