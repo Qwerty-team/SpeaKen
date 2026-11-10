@@ -901,6 +901,34 @@ app.get('/api/v1/topics/:id', async (req, res) => {
 // Sessions, topic generation, upload, profile edit (see demoRoutes.js)
 app.use(require('./demoRoutes')({ pool, requireAuth }));
 
+app.get('/api/v1/reports/export-csv', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const result = await pool.query(
+      `SELECT session_id, grammar_score, vocabulary_score, pronunciation_score, overall_score, created_at 
+       FROM session_evaluations 
+       WHERE user_id = $1 
+       ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    // Формируем CSV-строку прямо в памяти
+    let csv = 'Session ID,Grammar,Vocabulary,Pronunciation,Overall,Date\n';
+    for (const row of result.rows) {
+      csv += `${row.session_id},${row.grammar_score},${row.vocabulary_score},${row.pronunciation_score},${row.overall_score || 0},${row.created_at}\n`;
+    }
+
+    // Отдаем файл браузеру для скачивания
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=speaken-report.csv');
+    return res.status(200).send(csv);
+
+  } catch (err) {
+    console.error('EXPORT CSV ERROR:', err.message);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.get('/', (req, res) => {
   res.json({
