@@ -898,7 +898,6 @@ app.get('/api/v1/topics/:id', async (req, res) => {
   }
 });
 
-// Sessions, topic generation, upload, profile edit (see demoRoutes.js)
 app.use(require('./demoRoutes')({ pool, requireAuth }));
 
 app.get('/api/v1/reports/export-csv', requireAuth, async (req, res) => {
@@ -912,13 +911,11 @@ app.get('/api/v1/reports/export-csv', requireAuth, async (req, res) => {
       [userId]
     );
 
-    // Формируем CSV-строку прямо в памяти
     let csv = 'Session ID,Grammar,Vocabulary,Pronunciation,Overall,Date\n';
     for (const row of result.rows) {
       csv += `${row.session_id},${row.grammar_score},${row.vocabulary_score},${row.pronunciation_score},${row.overall_score || 0},${row.created_at}\n`;
     }
 
-    // Отдаем файл браузеру для скачивания
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename=speaken-report.csv');
     return res.status(200).send(csv);
