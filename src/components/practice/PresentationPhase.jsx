@@ -107,7 +107,7 @@ export default function PresentationPhase({ session, onComplete, analyzing }) {
       </p>
 
       <div className="relative mx-auto mt-6 aspect-video w-full overflow-hidden rounded-3xl bg-primary">
-        <video ref={videoRef} className="h-full w-full object-cover" playsInline />
+        <video ref={videoRef} className="h-full w-full object-cover -scale-x-100" playsInline />
         {permissionError ? (
           <div className="absolute inset-0 flex items-center justify-center bg-primary p-6 text-sm text-primary-foreground">
             {permissionError}
