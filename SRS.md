@@ -203,5 +203,7 @@ The platform provides university students with automated, real-time AI feedback 
 
 
 ## Sources Materials 
-* **English** resources - https://link.springer.com/
-* **German** resources - https://lingua.com/german/reading/
+* **English** Advanced resources - https://link.springer.com/
+* **English** levelbylevel resources - https://speecher.org/en/english/reading
+* **English** news resources - https://breakingnewsenglish.com/2609/260928-loud-music-public-transport.html
+* **English** articles resources - https://ideasinenglish.com/read/
