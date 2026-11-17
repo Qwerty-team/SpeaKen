@@ -4,8 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const { analyzePronunciation } = require('../services/azureSpeech'); // Укажите правильный путь к папке с сервисами, если он отличается
-const { generateFeedback } = require('../services/geminiFeedback');
+const { analyzePronunciation } = require('./azureSpeech'); // Укажите правильный путь к папке с сервисами, если он отличается
+const { generateFeedback } = require('./geminiFeedback');
 
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 
