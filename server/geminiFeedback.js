@@ -122,7 +122,6 @@ If there are no actual grammar or vocabulary mistakes,
 return an empty array for that category.
 `;
 
-  const response = await ai.models.generateContent({
     let response;
     let lastError;
     
@@ -165,7 +164,7 @@ return an empty array for that category.
     if (!response) {
       throw lastError || new Error('Gemini did not return a response');
     }
-  });
+  
 
   let result;
 
