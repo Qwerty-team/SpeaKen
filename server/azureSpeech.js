@@ -1,73 +1,112 @@
 const sdk = require('microsoft-cognitiveservices-speech-sdk');
 
+// Practice language (as the frontend sends it) -> Azure locale.
+const LOCALES = { English: 'en-US', German: 'de-DE' };
+
+function average(list, key) {
+  const values = list.map((x) => x[key]).filter((v) => typeof v === 'number');
+  if (values.length === 0) return null;
+  return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
 /**
- * Analyzes audio pronunciation, accuracy, and fluency using Azure AI Speech.
- * @param {Buffer} audioBuffer - Audio file buffer (WAV format recommended)
- * @returns {Promise<{transcript: string, scores: Array}>}
+ * Speech-to-text + unscripted pronunciation assessment with Azure AI Speech.
+ *
+ * @param {Buffer} pcmBuffer  Raw audio: 16 kHz, 16-bit, mono PCM (see speechAnalysis.toPcm)
+ * @param {object} options
+ * @param {string} options.language  "English" | "German"
+ * @param {number} options.timeoutMs Give up after this long
+ * @returns {Promise<{transcript, wordCount, accuracy, fluency, pronunciation, mispronounced}>}
+ *          Scores are 0–100, or null when no speech was recognised.
  */
-async function analyzePronunciation(audioBuffer) {
+function analyzePronunciation(pcmBuffer, { language = 'English', timeoutMs = 240000 } = {}) {
+  if (!process.env.AZURE_SPEECH_KEY || !process.env.AZURE_SPEECH_REGION) {
+    return Promise.reject(new Error('AZURE_SPEECH_KEY / AZURE_SPEECH_REGION are not set'));
+  }
+
   return new Promise((resolve, reject) => {
-    // 1. Configure Azure Speech SDK
     const speechConfig = sdk.SpeechConfig.fromSubscription(
       process.env.AZURE_SPEECH_KEY,
       process.env.AZURE_SPEECH_REGION
     );
-    speechConfig.speechRecognitionLanguage = 'en-US';
+    speechConfig.speechRecognitionLanguage = LOCALES[language] || 'en-US';
 
-    // 2. Set up audio input from buffer
-    const pushStream = sdk.AudioInputStream.createPushStream();
-    pushStream.write(audioBuffer);
+    const format = sdk.AudioStreamFormat.getWaveFormatPCM(16000, 16, 1);
+    const pushStream = sdk.AudioInputStream.createPushStream(format);
+    // The SDK expects an ArrayBuffer, not a Node Buffer.
+    pushStream.write(pcmBuffer.buffer.slice(pcmBuffer.byteOffset, pcmBuffer.byteOffset + pcmBuffer.byteLength));
     pushStream.close();
-    
+
     const audioConfig = sdk.AudioConfig.fromStreamInput(pushStream);
     const recognizer = new sdk.SpeechRecognizer(speechConfig, audioConfig);
 
-    // 3. Configure Pronunciation Assessment
-    const pronunciationAssessmentConfig = new sdk.PronunciationAssessmentConfig(
+    // Empty reference text = unscripted assessment (the student speaks freely).
+    const assessment = new sdk.PronunciationAssessmentConfig(
       '',
       sdk.PronunciationAssessmentGradingSystem.HundredMark,
-      sdk.PronunciationAssessmentGranularity.Phoneme,
-      true
+      sdk.PronunciationAssessmentGranularity.Word,
+      false
     );
-    pronunciationAssessmentConfig.applyTo(recognizer);
+    assessment.applyTo(recognizer);
 
-    let fullTranscript = '';
-    let wordScores = [];
+    const segments = [];
+    const words = [];
+    let finished = false;
 
-    // 4. Capture recognition events (continuous mode for 1-3 min recordings)
-    recognizer.recognized = (s, e) => {
-      if (e.result.reason === sdk.ResultReason.RecognizedSpeech) {
-        fullTranscript += e.result.text + ' ';
-        const res = sdk.PronunciationAssessmentResult.fromResult(e.result);
-        if (res) {
-          wordScores.push({
-            accuracyScore: res.accuracyScore,
-            pronunciationScore: res.pronunciationScore,
-            completenessScore: res.completenessScore,
-            fluencyScore: res.fluencyScore
+    const finish = (err) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      recognizer.stopContinuousRecognitionAsync(
+        () => {
+          recognizer.close();
+          if (err) return reject(err);
+          const transcript = segments.map((s) => s.text).join(' ').replace(/\s+/g, ' ').trim();
+          resolve({
+            transcript,
+            wordCount: transcript ? transcript.split(/\s+/).filter(Boolean).length : 0,
+            accuracy: average(segments, 'accuracy'),
+            fluency: average(segments, 'fluency'),
+            pronunciation: average(segments, 'pronunciation'),
+            mispronounced: words
+              .filter((w) => typeof w.accuracy === 'number' && w.accuracy < 60)
+              .slice(0, 15),
           });
+        },
+        () => {
+          recognizer.close();
+          reject(err || new Error('Azure: could not stop recognition'));
         }
+      );
+    };
+
+    const timer = setTimeout(() => finish(new Error('Azure: recognition timed out')), timeoutMs);
+
+    recognizer.recognized = (s, e) => {
+      if (e.result.reason !== sdk.ResultReason.RecognizedSpeech || !e.result.text) return;
+      const pa = sdk.PronunciationAssessmentResult.fromResult(e.result);
+      segments.push({
+        text: e.result.text,
+        accuracy: pa?.accuracyScore,
+        fluency: pa?.fluencyScore,
+        pronunciation: pa?.pronunciationScore,
+      });
+      for (const w of pa?.detailResult?.Words || []) {
+        words.push({ word: w.Word, accuracy: w.PronunciationAssessment?.AccuracyScore });
       }
     };
 
-    recognizer.sessionStopped = (s, e) => {
-      recognizer.stopContinuousRecognitionAsync(() => {
-        resolve({
-          transcript: fullTranscript.trim(),
-          scores: wordScores
-        });
-      });
-    };
-
     recognizer.canceled = (s, e) => {
-      recognizer.stopContinuousRecognitionAsync(() => {
-        reject(new Error(`Azure Recognition Canceled: ${e.errorDetails}`));
-      });
+      if (e.reason === sdk.CancellationReason.EndOfStream) return finish();
+      finish(new Error(`Azure recognition canceled: ${e.errorDetails || e.reason}`));
     };
+    recognizer.sessionStopped = () => finish();
 
-    // 5. Start continuous recognition
-    recognizer.startContinuousRecognitionAsync();
+    recognizer.startContinuousRecognitionAsync(
+      () => {},
+      (err) => finish(new Error(`Azure: could not start recognition: ${err}`))
+    );
   });
 }
 
-module.exports = { analyzePronunciation };
+module.exports = { analyzePronunciation, LOCALES };
