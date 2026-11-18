@@ -265,18 +265,33 @@ module.exports = function demoRoutes({ pool, requireAuth }) {
   }));
 
   router.post('/api/sessions', requireAuth, wrap(async (req, res) => {
-    if (req.body?.status && !STATUSES.includes(req.body.status)) {
-      return res.status(400).json({ error: 'Invalid status' });
-    }
-    const { fields, values } = pickSessionFields(req.body);
-    const cols = ['user_id', ...fields];
-    const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ');
-    const { rows } = await pool.query(
-      `INSERT INTO practice_sessions (${cols.join(', ')}) VALUES (${placeholders}) RETURNING *`,
-      [uid(req), ...values]
-    );
-    res.status(201).json(serializeSession(rows[0]));
-  }));
+  const body = { ...(req.body || {}) };
+
+  // Default values for required database columns.
+  body.status = body.status || 'research';
+  body.evaluation_scale = body.evaluation_scale || '100-point';
+  body.strengths = Array.isArray(body.strengths) ? body.strengths : [];
+  body.improvements = Array.isArray(body.improvements) ? body.improvements : [];
+
+  if (!STATUSES.includes(body.status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  const { fields, values } = pickSessionFields(body);
+
+  const cols = ['user_id', ...fields];
+  const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ');
+
+  const { rows } = await pool.query(
+    `INSERT INTO practice_sessions (${cols.join(', ')})
+     VALUES (${placeholders})
+     RETURNING *`,
+    [uid(req), ...values]
+  );
+
+  res.status(201).json(serializeSession(rows[0]));
+}));
+
 
   router.get('/api/sessions/:id', requireAuth, wrap(async (req, res) => {
     const id = Number(req.params.id);
