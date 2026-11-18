@@ -179,8 +179,24 @@ async function analyzePronunciation(audioBuffer) {
     };
 
     recognizer.canceled = (sender, event) => {
+      console.log('Azure cancellation details:', {
+        reason: event.reason,
+        reasonName: sdk.CancellationReason[event.reason],
+        errorCode: event.errorCode,
+        errorDetails: event.errorDetails
+      });
+    
+      if (event.reason === sdk.CancellationReason.EndOfStream) {
+        finish(null, {
+          transcript: transcript.trim(),
+          scores,
+          averages: averageScores(scores)
+        });
+        return;
+      }
+    
       finish(new Error(
-        `Azure recognition canceled: ${event.errorDetails || event.reason}`
+        `Azure recognition failed: ${event.errorDetails || event.errorCode || event.reason}`
       ));
     };
 
