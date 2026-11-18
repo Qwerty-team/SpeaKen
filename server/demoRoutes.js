@@ -9,53 +9,6 @@ const { generateFeedback } = require('./geminiFeedback');
 
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 
-const MIGRATION = `
-ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(100);
-ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(150);
-ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500);
-ALTER TABLE users ADD COLUMN IF NOT EXISTS language VARCHAR(30) DEFAULT 'English';
-
-ALTER TABLE topics ADD COLUMN IF NOT EXISTS difficulty VARCHAR(20) DEFAULT 'intermediate';
-ALTER TABLE topics ADD COLUMN IF NOT EXISTS reading_text TEXT;
-ALTER TABLE topics ADD COLUMN IF NOT EXISTS key_facts JSONB DEFAULT '[]';
-ALTER TABLE topics ADD COLUMN IF NOT EXISTS vocabulary JSONB DEFAULT '[]';
-
-CREATE TABLE IF NOT EXISTS practice_sessions (
-    id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
-    topic_id BIGINT REFERENCES topics(id) ON DELETE SET NULL,
-    session_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    duration_minutes INT,
-    feedback TEXT
-);
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'research';
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS topic VARCHAR(300);
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS topic_guidance TEXT;
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS language VARCHAR(30);
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS category VARCHAR(50);
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS difficulty VARCHAR(20);
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS evaluation_scale VARCHAR(20) NOT NULL DEFAULT '100-point';
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS research_duration_seconds INT;
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS speaking_time_limit INT;
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS speaking_duration_seconds INT;
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS recording_url VARCHAR(500);
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS transcript TEXT;
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS overall_score NUMERIC(5, 2);
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS overall_band NUMERIC(3, 1);
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS content_score NUMERIC(5, 2);
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS fluency_score NUMERIC(5, 2);
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS grammar_score NUMERIC(5, 2);
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS vocabulary_score NUMERIC(5, 2);
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS pronunciation_score NUMERIC(5, 2);
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS feedback_summary TEXT;
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS strengths JSONB NOT NULL DEFAULT '[]';
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS improvements JSONB NOT NULL DEFAULT '[]';
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS filler_words_notes TEXT;
-ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-CREATE INDEX IF NOT EXISTS idx_sessions_user_status ON practice_sessions(user_id, status, session_date DESC);
-`;
-
 const STATUSES = ['research', 'presentation', 'completed', 'abandoned'];
 const TEXT_FIELDS = [
   'status', 'topic', 'topic_guidance', 'language', 'category', 'difficulty', 'evaluation_scale',
@@ -228,24 +181,27 @@ function demoAnalysis({ audio_url = '', speaking_duration_seconds = 0, evaluatio
   };
 }
 module.exports = function demoRoutes({ pool, requireAuth }) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-
-  const ready = pool
-    .query(MIGRATION)
-    
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });    
 
   const router = express.Router();
   const uid = (req) => req.user.id;
   const wrap = (fn) => async (req, res) => {
-    try {
-      await ready;
-      await fn(req, res);
-    } catch (err) {
-      console.error(`❌ ${req.method} ${req.path}:`, err.message);
-      if (err.code === '23505') return res.status(409).json({ error: 'This value is already taken' });
-      res.status(500).json({ error: 'Internal Server Error' });
-    }
-  };
+      try {
+        await fn(req, res);
+      } catch (err) {
+        console.error(`❌ ${req.method} ${req.path}:`, err.message);
+    
+        if (err.code === '23505') {
+          return res.status(409).json({
+            error: 'This value is already taken'
+          });
+        }
+    
+        res.status(500).json({
+          error: 'Internal Server Error'
+        });
+      }
+    };
 
   router.get('/api/health', wrap(async (req, res) => {
     await pool.query('SELECT 1');
