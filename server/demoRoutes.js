@@ -371,15 +371,29 @@ module.exports = function demoRoutes({ pool, requireAuth }) {
 
     const audioBuffer = fs.readFileSync(filePath);
 
-    let transcript = '';
-    let wordScores = [];
+    let azureResult;
+
     try {
-      const azureResult = await analyzePronunciation(audioBuffer);
-      transcript = azureResult.transcript;
-      wordScores = azureResult.scores;
+      azureResult = await analyzePronunciation(audioBuffer);
     } catch (err) {
       console.error('Azure Speech Error:', err);
-      transcript = 'Speech recognition failed.';
+    
+      return res.status(502).json({
+        error: 'Azure Speech analysis failed',
+        details: err.message
+      });
+    }
+    
+    const transcript = azureResult.transcript;
+    const wordScores = azureResult.scores;
+    
+    if (!transcript || transcript.trim().length === 0) {
+      return res.status(422).json({
+        error: 'No speech detected',
+        message: 'Please record your answer again.',
+        transcript: '',
+        scores: []
+      });
     }
 
     let aiResult = {};
