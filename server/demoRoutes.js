@@ -406,16 +406,11 @@ module.exports = function demoRoutes({ pool, requireAuth }) {
       });
     } catch (err) {
       console.error('Gemini AI Error:', err);
-      aiResult = {
-        overall_score: 75,
-        content_score: 18,
-        fluency_score: 19,
-        grammar_score: 19,
-        vocabulary_score: 19,
-        feedback_summary: 'Analysis completed with fallback values.',
-        strengths: ['Good effort'],
-        improvements: ['Keep practicing'],
-      };
+    
+      return res.status(502).json({
+        error: 'Gemini feedback generation failed',
+        details: err.message
+      });
     }
 
     const scale = evaluation_scale === 'ielts' ? 'ielts' : '100-point';
