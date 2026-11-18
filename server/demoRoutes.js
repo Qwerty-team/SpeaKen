@@ -341,87 +341,146 @@ module.exports = function demoRoutes({ pool, requireAuth }) {
   }));
 
   router.post('/api/functions/analyzePresentation', requireAuth, wrap(async (req, res) => {
-    const { audio_url, speaking_duration_seconds, evaluation_scale, topic } = req.body;
+  const {
+    audio_url,
+    speaking_duration_seconds,
+    evaluation_scale,
+    topic,
+    difficulty
+  } = req.body;
 
-    if (!audio_url) {
-      return res.status(400).json({ error: 'No audio file provided' });
-    }
+  if (!audio_url) {
+    return res.status(400).json({
+      error: 'Audio URL is required'
+    });
+  }
 
-    const filePath = path.join(UPLOAD_DIR, path.basename(audio_url));
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Audio file not found on server' });
-    }
+  // First version supports only the 100-point scale.
+  if (evaluation_scale && evaluation_scale !== '100-point') {
+    return res.status(400).json({
+      error: 'Only the 100-point evaluation scale is supported'
+    });
+  }
 
-    const audioBuffer = fs.readFileSync(filePath);
+  const fileName = path.basename(audio_url);
+  const filePath = path.join(UPLOAD_DIR, fileName);
 
-    let azureResult;
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({
+      error: 'Audio file not found'
+    });
+  }
 
-    try {
-      azureResult = await analyzePronunciation(audioBuffer);
-    } catch (err) {
-      console.error('Azure Speech Error:', err);
-    
-      return res.status(502).json({
-        error: 'Azure Speech analysis failed',
-        details: err.message
-      });
-    }
-    
-    const transcript = azureResult.transcript;
-    const wordScores = azureResult.scores;
-    
-    if (!transcript || transcript.trim().length === 0) {
-      return res.status(422).json({
-        error: 'No speech detected',
-        message: 'Please record your answer again.',
-        transcript: '',
-        scores: []
-      });
-    }
+  const audioBuffer = fs.readFileSync(filePath);
 
-    let aiResult = {};
-    try {
-      aiResult = await generateFeedback({
-        question: topic || 'General practice',
-        level: 'intermediate',
-        transcript,
-        azureAssessment: wordScores
-      });
-    } catch (err) {
-      console.error('Gemini AI Error:', err);
-    
-      return res.status(502).json({
-        error: 'Gemini feedback generation failed',
-        details: err.message
-      });
-    }
+  // STEP 1: Speech recognition and pronunciation assessment.
+  let azureResult;
 
-    const scale = evaluation_scale === 'ielts' ? 'ielts' : '100-point';
-    const responseData = {
-      scale,
+  try {
+    azureResult = await analyzePronunciation(audioBuffer);
+  } catch (err) {
+    console.error('Azure analysis error:', err);
+
+    return res.status(502).json({
+      error: 'Azure Speech analysis failed',
+      details: err.message
+    });
+  }
+
+  const transcript = azureResult.transcript;
+
+  if (!transcript || !transcript.trim()) {
+    return res.status(422).json({
+      error: 'No speech detected in the recording'
+    });
+  }
+
+  // STEP 2: Check Azure fluency assessment.
+  const azureFluency = azureResult.averages?.fluencyScore;
+
+  if (!Number.isFinite(azureFluency)) {
+    console.error('Azure did not return a valid fluency score');
+
+    return res.status(502).json({
+      error: 'Azure could not assess speech fluency'
+    });
+  }
+
+  // Convert Azure's 0-100 score into SpeaKen's 0-25 scale.
+  const fluencyScore = Math.round(
+    Math.max(0, Math.min(100, azureFluency)) / 4
+  );
+
+  // STEP 3: Analyze transcript using Gemini.
+  let aiResult;
+
+  try {
+    aiResult = await generateFeedback({
+      question: topic || 'General speaking practice',
+      level: difficulty || 'intermediate',
       transcript,
-      feedback_summary: aiResult.feedback_summary || 'Analysis complete.',
-      strengths: aiResult.strengths || [],
-      improvements: aiResult.improvements || [],
-      filler_words_notes: 'Analyzed via Azure & Gemini.',
-    };
+      azureAssessment: azureResult.averages
+    });
+  } catch (err) {
+    console.error('Gemini analysis error:', err);
 
-    if (scale === 'ielts') {
-      responseData.overall_band = aiResult.overall_band || 6.5;
-      responseData.fluency_score = aiResult.fluency_score || 6.0;
-      responseData.vocabulary_score = aiResult.vocabulary_score || 6.5;
-      responseData.grammar_score = aiResult.grammar_score || 6.0;
-      responseData.pronunciation_score = aiResult.pronunciation_score || 6.5;
-    } else {
-      responseData.overall_score = aiResult.overall_score || 75;
-      responseData.content_score = aiResult.content_score || 18;
-      responseData.fluency_score = aiResult.fluency_score || 19;
-      responseData.grammar_score = aiResult.grammar_score || 19;
-      responseData.vocabulary_score = aiResult.vocabulary_score || 19;
-    }
+    return res.status(502).json({
+      error: 'Gemini feedback generation failed',
+      details: err.message
+    });
+  }
 
-    res.json(responseData);
-  }));
+  // STEP 4: Calculate the final scores.
+  const contentScore = Math.round(aiResult.content_score);
+  const grammarScore = Math.round(aiResult.grammar_score);
+  const vocabularyScore = Math.round(aiResult.vocabulary_score);
+
+  const overallScore =
+    contentScore +
+    fluencyScore +
+    vocabularyScore +
+    grammarScore;
+
+  // STEP 5: Prepare the result for the frontend.
+  const responseData = {
+    scale: '100-point',
+
+    transcript,
+
+    overall_score: overallScore,
+    content_score: contentScore,
+    fluency_score: fluencyScore,
+    vocabulary_score: vocabularyScore,
+    grammar_score: grammarScore,
+
+    feedback_summary: aiResult.feedback_summary || '',
+    strengths: aiResult.strengths,
+    improvements: aiResult.improvements,
+
+    grammar: aiResult.grammar,
+    vocabulary: aiResult.vocabulary,
+    coherence: aiResult.coherence,
+    exercises: aiResult.exercises,
+
+    filler_words_notes: aiResult.filler_words_notes || '',
+
+    speaking_duration_seconds:
+      Number.isFinite(Number(speaking_duration_seconds))
+        ? Number(speaking_duration_seconds)
+        : null
+  };
+
+  console.log('Speaking analysis completed:', {
+    overall_score: overallScore,
+    content_score: contentScore,
+    fluency_score: fluencyScore,
+    vocabulary_score: vocabularyScore,
+    grammar_score: grammarScore
+  });
+
+  return res.json(responseData);
+}));
+
     
   router.post(
     '/api/upload',
