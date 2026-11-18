@@ -123,11 +123,47 @@ return an empty array for that category.
 `;
 
   const response = await ai.models.generateContent({
-    model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
-    contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-      temperature: 0.2
+    let response;
+    let lastError;
+    
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        response = await ai.models.generateContent({
+          model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            temperature: 0.2
+          }
+        });
+    
+        break;
+      } catch (error) {
+        lastError = error;
+    
+        const status = Number(error.status || error.code);
+    
+        // Retry only temporary server or rate-limit errors.
+        if (![429, 500, 503, 504].includes(status)) {
+          throw error;
+        }
+    
+        if (attempt === 2) {
+          throw error;
+        }
+    
+        const delay = 1000 * Math.pow(2, attempt);
+    
+        console.log(
+          `Gemini temporary error ${status}. Retry ${attempt + 1}/2 in ${delay}ms`
+        );
+    
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    
+    if (!response) {
+      throw lastError || new Error('Gemini did not return a response');
     }
   });
 
