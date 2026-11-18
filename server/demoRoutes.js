@@ -207,6 +207,25 @@ module.exports = function demoRoutes({ pool, requireAuth }) {
     await pool.query('SELECT 1');
     res.json({ status: 'ok', database: 'connected' });
   }));
+  router.get('/api/debug/schema', requireAuth, wrap(async (req, res) => {
+  const tables = [
+    'users',
+    'topics',
+    'practice_sessions',
+    'audio_recordings'
+  ];
+
+  const result = await pool.query(
+    `SELECT table_name, column_name, data_type, is_nullable
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = ANY($1)
+     ORDER BY table_name, ordinal_position`,
+    [tables]
+  );
+
+  res.json(result.rows);
+}));
   router.patch('/api/auth/me', requireAuth, wrap(async (req, res) => {
     const fields = PROFILE_FIELDS.filter((k) => req.body && req.body[k] !== undefined);
     let row;
