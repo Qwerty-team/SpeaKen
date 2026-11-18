@@ -357,17 +357,40 @@ module.exports = function demoRoutes({ pool, requireAuth }) {
 
   router.post('/api/functions/analyzePresentation', requireAuth, wrap(async (req, res) => {
   const {
-    audio_url,
-    speaking_duration_seconds,
-    evaluation_scale,
-    topic,
-    difficulty
+  audio_url,
+  session_id,
+  speaking_duration_seconds,
+  evaluation_scale,
+  topic,
+  difficulty
   } = req.body;
 
   if (!audio_url) {
     return res.status(400).json({
       error: 'Audio URL is required'
     });
+  }
+    let sessionId = null;
+  
+    if (session_id !== undefined && session_id !== null) {
+      sessionId = Number(session_id);
+    
+      if (!Number.isSafeInteger(sessionId) || sessionId <= 0) {
+        return res.status(400).json({
+          error: 'Invalid session ID'
+        });
+      }
+    
+      const { rows } = await pool.query(
+        'SELECT id FROM practice_sessions WHERE id = $1 AND user_id = $2',
+        [sessionId, uid(req)]
+      );
+    
+      if (rows.length === 0) {
+        return res.status(404).json({
+          error: 'Practice session not found'
+      });
+    }
   }
 
   // First version supports only the 100-point scale.
@@ -493,7 +516,46 @@ module.exports = function demoRoutes({ pool, requireAuth }) {
     grammar_score: grammarScore
   });
 
-  return res.json(responseData);
+  if (sessionId !== null) {
+  await pool.query(
+    `UPDATE practice_sessions
+     SET
+       recording_url = $1,
+       transcript = $2,
+       overall_score = $3,
+       content_score = $4,
+       fluency_score = $5,
+       vocabulary_score = $6,
+       grammar_score = $7,
+       feedback_summary = $8,
+       strengths = $9,
+       improvements = $10,
+       filler_words_notes = $11,
+       speaking_duration_seconds = $12,
+       evaluation_scale = '100-point',
+       status = 'completed',
+       updated_at = CURRENT_TIMESTAMP
+     WHERE id = $13 AND user_id = $14`,
+    [
+      audio_url,
+      transcript,
+      overallScore,
+      contentScore,
+      fluencyScore,
+      vocabularyScore,
+      grammarScore,
+      responseData.feedback_summary,
+      JSON.stringify(responseData.strengths || []),
+      JSON.stringify(responseData.improvements || []),
+      responseData.filler_words_notes,
+      responseData.speaking_duration_seconds,
+      sessionId,
+      uid(req)
+    ]
+  );
+}
+
+return res.json(responseData);
 }));
 
     
