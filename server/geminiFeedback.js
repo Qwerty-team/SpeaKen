@@ -1,5 +1,6 @@
 
-const { GoogleGenAI } = require("@google/genai");
+
+const { GoogleGenAI } = require('@google/genai');
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY
@@ -11,103 +12,170 @@ async function generateFeedback({
   transcript,
   azureAssessment
 }) {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error('Gemini API key is missing');
+  }
+
+  if (!transcript || !transcript.trim()) {
+    throw new Error('Transcript is empty');
+  }
+
   const prompt = `
-You are an experienced English speaking coach.
+You are an experienced English speaking examiner and language coach.
 
-Analyze the student's actual spoken response.
+Evaluate the student's spoken response using ONLY the transcript provided.
 
-Practice question: ${question}
-Target English level: ${level || "Intermediate"}
+PRACTICE QUESTION:
+${question || 'General speaking practice'}
 
-Student transcript:
+TARGET ENGLISH LEVEL:
+${level || 'Intermediate'}
+
+STUDENT TRANSCRIPT:
 ${transcript}
 
-Azure pronunciation and fluency assessment:
-${JSON.stringify(azureAssessment)}
+AZURE SPEECH ASSESSMENT:
+${JSON.stringify(azureAssessment || {})}
 
-IMPORTANT RULES:
-1. Analyze only the provided transcript.
-2. Never invent mistakes or sentences that are not present.
-3. If the student's grammar is correct, return an empty grammar array.
-4. Do not invent pronunciation errors. Use Azure metrics as evidence.
-5. Give specific explanations and practical recommendations.
-6. Evaluate content relevance to the practice question.
-7. Do not confuse spoken informal language with grammatical errors.
-8. All feedback must be in English.
+EVALUATION RULES:
 
-Return ONLY valid JSON with this structure:
+1. CONTENT (0-25):
+Evaluate relevance, completeness, development of ideas,
+examples, and whether the student answers the question.
+
+2. VOCABULARY (0-25):
+Evaluate vocabulary range, precision, appropriateness,
+word choice, and repetition.
+
+3. GRAMMAR (0-25):
+Evaluate grammatical accuracy, sentence structure,
+and variety of grammatical constructions.
+
+4. FLUENCY:
+Do not assign a numerical fluency score.
+Azure provides the fluency assessment separately.
+
+5. PRONUNCIATION:
+Do not invent pronunciation mistakes.
+Azure provides pronunciation assessment separately.
+
+6. FEEDBACK:
+- Analyze only what the student actually said.
+- Never invent grammar or vocabulary errors.
+- If a sentence is correct, do not mark it as incorrect.
+- Explain corrections clearly.
+- Give practical recommendations.
+- Consider the target level when evaluating.
+- Do not penalize informal but natural spoken English.
+- All feedback must be written in English.
+
+SCORING:
+Each of the three criteria must be an integer from 0 to 25.
+Scores must reflect the actual transcript.
+Do not automatically give high scores.
+
+Return valid JSON with exactly this structure:
 
 {
-  "feedback_summary": "string",
-
-  "grammar": [
-    {
-      "original": "string",
-      "correction": "string",
-      "explanation": "string"
-    }
-  ],
-
-  "vocabulary": [
-    {
-      "original": "string",
-      "suggestion": "string",
-      "reason": "string"
-    }
-  ],
-
-  "coherence": {
-    "observations": ["string"],
-    "suggestions": ["string"]
-  },
-
+  "feedback_summary": "Short overall evaluation",
   "content_score": 0,
   "grammar_score": 0,
   "vocabulary_score": 0,
-
-  "strengths": ["string"],
-  "improvements": ["string"],
-
-  "exercises": [
+  "strengths": [
+    "Specific strength"
+  ],
+  "improvements": [
+    "Specific actionable recommendation"
+  ],
+  "grammar": [
     {
-      "task": "string",
-      "reason": "string"
+      "original": "Original phrase",
+      "correction": "Corrected phrase",
+      "explanation": "Why it should be corrected"
     }
   ],
-
-  "filler_words_notes": "string"
+  "vocabulary": [
+    {
+      "original": "Original word or phrase",
+      "suggestion": "Better alternative",
+      "reason": "Why it is more appropriate"
+    }
+  ],
+  "coherence": {
+    "observations": [
+      "Observation about idea organization"
+    ],
+    "suggestions": [
+      "Suggestion for improving coherence"
+    ]
+  },
+  "exercises": [
+    {
+      "task": "Practice task",
+      "reason": "Why this task is useful"
+    }
+  ],
+  "filler_words_notes": "Comments about filler words, repetitions and pauses. Only mention evidence visible in the transcript. If pauses cannot be determined from the transcript, say so."
 }
 
-Scoring:
-- content_score: 0-25
-- grammar_score: 0-25
-- vocabulary_score: 0-25
-
-Be fair to the student's target level.
-Do not award points based on recording duration alone.
+If there are no actual grammar or vocabulary mistakes,
+return an empty array for that category.
 `;
 
   const response = await ai.models.generateContent({
-    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
     contents: prompt,
     config: {
-      responseMimeType: "application/json"
+      responseMimeType: 'application/json',
+      temperature: 0.2
     }
   });
 
-  const result = JSON.parse(response.text);
+  let result;
 
-  if (
-    !result ||
-    !Array.isArray(result.grammar) ||
-    !Array.isArray(result.vocabulary) ||
-    !Array.isArray(result.strengths) ||
-    !Array.isArray(result.improvements)
-  ) {
-    throw new Error("Invalid Gemini response structure");
+  try {
+    result = JSON.parse(response.text);
+  } catch (error) {
+    throw new Error('Gemini returned invalid JSON');
+  }
+
+  if (!result || typeof result !== 'object') {
+    throw new Error('Invalid Gemini response');
+  }
+
+  const scoreFields = [
+    'content_score',
+    'grammar_score',
+    'vocabulary_score'
+  ];
+
+  for (const field of scoreFields) {
+    if (
+      typeof result[field] !== 'number' ||
+      !Number.isFinite(result[field]) ||
+      result[field] < 0 ||
+      result[field] > 25
+    ) {
+      throw new Error(`Gemini returned an invalid ${field}`);
+    }
+  }
+
+  const arrayFields = [
+    'strengths',
+    'improvements',
+    'grammar',
+    'vocabulary',
+    'exercises'
+  ];
+
+  for (const field of arrayFields) {
+    if (!Array.isArray(result[field])) {
+      throw new Error(`Gemini returned an invalid ${field} array`);
+    }
   }
 
   return result;
 }
 
 module.exports = { generateFeedback };
+
