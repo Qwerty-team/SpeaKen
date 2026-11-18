@@ -215,24 +215,22 @@ module.exports = function demoRoutes({ pool, requireAuth }) {
     'audio_recordings'
   ];
 
-  const result = await pool.query(
-    `SELECT
-    table_name,
-    column_name,
-    column_default,
-    is_nullable
+  const result = await pool.query(`
+    SELECT
+        table_name,
+        column_name,
+        data_type,
+        is_nullable
     FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name IN (
-      'practice_sessions',
-      'audio_recordings',
-      'topics',
-      'users'
-    )
-    AND is_nullable = 'NO'
-    ORDER BY table_name, ordinal_position;`,
-    [tables]
-  );
+          'users',
+          'topics',
+          'practice_sessions',
+          'audio_recordings'
+      )
+    ORDER BY table_name, ordinal_position
+`);
 
   res.json(result.rows);
 }));
