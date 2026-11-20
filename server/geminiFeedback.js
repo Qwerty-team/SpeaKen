@@ -1,10 +1,44 @@
 
-
 const { GoogleGenAI } = require('@google/genai');
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY
 });
+
+function clampScore(value, fallback = 12) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(0, Math.min(25, Math.round(num)));
+}
+
+function normalizeStringArray(value, fallback = []) {
+  if (!Array.isArray(value)) return fallback;
+  return value
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter(Boolean);
+}
+
+function normalizeObjectArray(value) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item) => item && typeof item === 'object');
+}
+
+async function callWithTimeout(promise, timeoutMs, modelName) {
+  let timerId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timerId = setTimeout(() => {
+      const err = new Error(`Gemini request timed out after ${timeoutMs}ms on ${modelName}`);
+      err.status = 504;
+      reject(err);
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timerId);
+  }
+}
 
 async function generateFeedback({
   question,
@@ -122,10 +156,10 @@ If there are no actual grammar or vocabulary mistakes,
 return an empty array for that category.
 `;
 
-    const modelsToTry = Array.from(
+  const modelsToTry = Array.from(
     new Set([
-      process.env.GEMINI_MODEL || 'gemini-3.8-flash',
-      'gemini-2.5-flash-lite',
+      process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite',
+      'gemini-3.8-flash',
     ])
   );
 
@@ -133,36 +167,49 @@ return an empty array for that category.
   let lastError;
 
   for (const model of modelsToTry) {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        response = await ai.models.generateContent({
-          model,
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json',
-            temperature: 0.2,
-          },
-        });
+        console.log(`Calling Gemini model: ${model} (attempt ${attempt + 1}/2)`);
+
+        response = await callWithTimeout(
+          ai.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json',
+              temperature: 0.2,
+            },
+          }),
+          12000,
+          model
+        );
 
         break;
       } catch (error) {
         lastError = error;
 
-        const status = Number(error.status || error.code);
+        const status = Number(error?.status || error?.code);
+        const message = String(error?.message || '').toLowerCase();
+        const isTransient =
+          [429, 500, 503, 504].includes(status) ||
+          message.includes('timeout') ||
+          message.includes('unavailable') ||
+          message.includes('overloaded');
 
-        // Невременные ошибки (например, 400/401/404) сразу пробрасываем наверх
-        if (![429, 500, 503, 504].includes(status)) {
+        if (!isTransient) {
           throw error;
         }
 
-        if (attempt === 2) {
-          console.warn(`Gemini model ${model} failed after retries (${status}), trying next fallback if available.`);
+        if (attempt === 1) {
+          console.warn(
+            `Gemini model ${model} failed after retries (${status || 'timeout'}), trying next fallback if available.`
+          );
           break;
         }
 
-        const delay = 1000 * Math.pow(2, attempt) + Math.floor(Math.random() * 250);
+        const delay = 1000 + Math.floor(Math.random() * 250);
         console.log(
-          `Gemini temporary error ${status} on ${model}. Retry ${attempt + 1}/2 in ${delay}ms`
+          `Gemini temporary issue on ${model} (${status || 'timeout'}). Retry 1/1 in ${delay}ms`
         );
 
         await new Promise((resolve) => setTimeout(resolve, delay));
@@ -174,56 +221,48 @@ return an empty array for that category.
     }
   }
 
-  if (!response) {
+  if (!response || !response.text) {
     throw lastError || new Error('Gemini did not return a response');
   }
-  
 
-  let result;
-
+  let raw;
   try {
-    result = JSON.parse(response.text);
+    raw = JSON.parse(response.text);
   } catch (error) {
     throw new Error('Gemini returned invalid JSON');
   }
 
-  if (!result || typeof result !== 'object') {
+  if (!raw || typeof raw !== 'object') {
     throw new Error('Invalid Gemini response');
   }
 
-  const scoreFields = [
-    'content_score',
-    'grammar_score',
-    'vocabulary_score'
-  ];
+  const coherenceObj =
+    raw.coherence && typeof raw.coherence === 'object' ? raw.coherence : {};
 
-  for (const field of scoreFields) {
-    if (
-      typeof result[field] !== 'number' ||
-      !Number.isFinite(result[field]) ||
-      result[field] < 0 ||
-      result[field] > 25
-    ) {
-      throw new Error(`Gemini returned an invalid ${field}`);
-    }
-  }
-
-  const arrayFields = [
-    'strengths',
-    'improvements',
-    'grammar',
-    'vocabulary',
-    'exercises'
-  ];
-
-  for (const field of arrayFields) {
-    if (!Array.isArray(result[field])) {
-      throw new Error(`Gemini returned an invalid ${field} array`);
-    }
-  }
-
-  return result;
+  return {
+    feedback_summary:
+      typeof raw.feedback_summary === 'string' && raw.feedback_summary.trim()
+        ? raw.feedback_summary.trim()
+        : 'AI evaluation completed.',
+    content_score: clampScore(raw.content_score, 12),
+    grammar_score: clampScore(raw.grammar_score, 12),
+    vocabulary_score: clampScore(raw.vocabulary_score, 12),
+    strengths: normalizeStringArray(raw.strengths),
+    improvements: normalizeStringArray(raw.improvements),
+    grammar: normalizeObjectArray(raw.grammar),
+    vocabulary: normalizeObjectArray(raw.vocabulary),
+    coherence: {
+      observations: normalizeStringArray(coherenceObj.observations),
+      suggestions: normalizeStringArray(coherenceObj.suggestions),
+    },
+    exercises: normalizeObjectArray(raw.exercises),
+    filler_words_notes:
+      typeof raw.filler_words_notes === 'string' && raw.filler_words_notes.trim()
+        ? raw.filler_words_notes.trim()
+        : 'No specific filler word notes provided.',
+  };
 }
 
+module.exports = { generateFeedback };
 module.exports = { generateFeedback };
 
