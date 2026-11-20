@@ -122,48 +122,61 @@ If there are no actual grammar or vocabulary mistakes,
 return an empty array for that category.
 `;
 
-    let response;
-    let lastError;
-    
+    const modelsToTry = Array.from(
+    new Set([
+      process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+      'gemini-2.5-flash-lite',
+    ])
+  );
+
+  let response;
+  let lastError;
+
+  for (const model of modelsToTry) {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         response = await ai.models.generateContent({
-          model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+          model,
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
-            temperature: 0.2
-          }
+            temperature: 0.2,
+          },
         });
-    
+
         break;
       } catch (error) {
         lastError = error;
-    
+
         const status = Number(error.status || error.code);
-    
-        // Retry only temporary server or rate-limit errors.
+
+        // Невременные ошибки (например, 400/401/404) сразу пробрасываем наверх
         if (![429, 500, 503, 504].includes(status)) {
           throw error;
         }
-    
+
         if (attempt === 2) {
-          throw error;
+          console.warn(`Gemini model ${model} failed after retries (${status}), trying next fallback if available.`);
+          break;
         }
-    
-        const delay = 1000 * Math.pow(2, attempt);
-    
+
+        const delay = 1000 * Math.pow(2, attempt) + Math.floor(Math.random() * 250);
         console.log(
-          `Gemini temporary error ${status}. Retry ${attempt + 1}/2 in ${delay}ms`
+          `Gemini temporary error ${status} on ${model}. Retry ${attempt + 1}/2 in ${delay}ms`
         );
-    
-        await new Promise(resolve => setTimeout(resolve, delay));
+
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
-    
-    if (!response) {
-      throw lastError || new Error('Gemini did not return a response');
+
+    if (response) {
+      break;
     }
+  }
+
+  if (!response) {
+    throw lastError || new Error('Gemini did not return a response');
+  }
   
 
   let result;
