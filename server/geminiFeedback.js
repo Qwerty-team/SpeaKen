@@ -158,7 +158,7 @@ return an empty array for that category.
 
   const modelsToTry = Array.from(
     new Set([
-      process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite',
+      process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
       'gemini-3.8-flash',
     ])
   );
