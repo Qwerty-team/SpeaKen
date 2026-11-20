@@ -460,12 +460,26 @@ module.exports = function demoRoutes({ pool, requireAuth }) {
       azureAssessment: azureResult.averages
     });
   } catch (err) {
-    console.error('Gemini analysis error:', err);
+    console.error('Gemini analysis error, using fallback summary:', err.message);
 
-    return res.status(502).json({
-      error: 'Gemini feedback generation failed',
-      details: err.message
-    });
+    const pronScore25 = Number.isFinite(Number(azureResult.averages?.pronunciationScore))
+      ? Math.round(Math.max(0, Math.min(100, Number(azureResult.averages.pronunciationScore))) / 4)
+      : 12;
+
+    aiResult = {
+      feedback_summary:
+        'Speech recognition and fluency assessment completed via Azure. Detailed AI coaching feedback is temporarily unavailable due to high model demand.',
+      content_score: 12,
+      grammar_score: 12,
+      vocabulary_score: pronScore25,
+      strengths: ['Speech transcript and Azure fluency score were successfully captured.'],
+      improvements: ['Try regenerating AI feedback in a moment for detailed grammar and vocabulary notes.'],
+      grammar: [],
+      vocabulary: [],
+      coherence: { observations: [], suggestions: [] },
+      exercises: [],
+      filler_words_notes: 'Detailed transcript coaching was skipped due to temporary AI service load.'
+    };
   }
 
   // STEP 4: Calculate the final scores.
@@ -558,6 +572,93 @@ module.exports = function demoRoutes({ pool, requireAuth }) {
 return res.json(responseData);
 }));
 
+  router.post('/api/sessions/:id/regenerate-feedback', requireAuth, wrap(async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'Invalid session id' });
+    }
+
+    const { rows } = await pool.query(
+      'SELECT * FROM practice_sessions WHERE id = $1 AND user_id = $2',
+      [id, uid(req)]
+    );
+
+    const sessionRow = rows[0];
+    if (!sessionRow) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    if (!sessionRow.transcript || !sessionRow.transcript.trim()) {
+      return res.status(400).json({ error: 'No transcript available for this session' });
+    }
+
+    const fluencyScore = Number.isFinite(Number(sessionRow.fluency_score))
+      ? Math.round(Number(sessionRow.fluency_score))
+      : 0;
+
+    const aiResult = await generateFeedback({
+      question: sessionRow.topic || 'General speaking practice',
+      level: sessionRow.difficulty || 'intermediate',
+      transcript: sessionRow.transcript,
+      azureAssessment: {
+        fluencyScore: Math.min(100, fluencyScore * 4)
+      }
+    });
+
+    const contentScore = Math.round(aiResult.content_score);
+    const grammarScore = Math.round(aiResult.grammar_score);
+    const vocabularyScore = Math.round(aiResult.vocabulary_score);
+    const overallScore = contentScore + fluencyScore + vocabularyScore + grammarScore;
+
+    const { rows: updatedRows } = await pool.query(
+      `UPDATE practice_sessions
+       SET
+         overall_score = $1,
+         content_score = $2,
+         vocabulary_score = $3,
+         grammar_score = $4,
+         feedback_summary = $5,
+         strengths = $6,
+         improvements = $7,
+         filler_words_notes = $8,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = $9 AND user_id = $10
+       RETURNING *`,
+      [
+        overallScore,
+        contentScore,
+        vocabularyScore,
+        grammarScore,
+        aiResult.feedback_summary || '',
+        JSON.stringify(aiResult.strengths || []),
+        JSON.stringify(aiResult.improvements || []),
+        aiResult.filler_words_notes || '',
+        id,
+        uid(req)
+      ]
+    );
+
+    res.json({
+      session: serializeSession(updatedRows[0]),
+      evaluation: {
+        scale: sessionRow.evaluation_scale || '100-point',
+        transcript: sessionRow.transcript,
+        overall_score: overallScore,
+        content_score: contentScore,
+        fluency_score: fluencyScore,
+        vocabulary_score: vocabularyScore,
+        grammar_score: grammarScore,
+        feedback_summary: aiResult.feedback_summary || '',
+        strengths: aiResult.strengths || [],
+        improvements: aiResult.improvements || [],
+        grammar: aiResult.grammar || [],
+        vocabulary: aiResult.vocabulary || [],
+        coherence: aiResult.coherence || { observations: [], suggestions: [] },
+        exercises: aiResult.exercises || [],
+        filler_words_notes: aiResult.filler_words_notes || ''
+      }
+    });
+  }));
     
   router.post(
     '/api/upload',
