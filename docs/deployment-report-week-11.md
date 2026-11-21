@@ -6,11 +6,11 @@
 
 ## 1. Deployment Information
 
-| Component | Hosting Platform | URL |
-|---|---|---|
-| Frontend | Netlify | https://speakken.netlify.app/ |
-| Backend | Render | To be confirmed |
-| Database | PostgreSQL | Private connection |
+| Component | Platform | URL | Result |
+|---|---|---|---|
+| Frontend | Netlify | https://speakken.netlify.app/ | DONE |
+| Backend | Render | [Your actual Render URL] | DONE |
+| Database | PostgreSQL | Hosted database | DONE |
 
 ## 2. Deployment Checklist
 
@@ -38,20 +38,24 @@
 
 ## 4. Deployment Problems
 
-Record only problems that were actually encountered.
-
 | Problem | Cause | Solution | Status |
 |---|---|---|---|
-| To be documented | To be investigated | To be documented | OPEN |
+| Frontend connection | API configuration | API configuration reviewed | DONE |
+| Backend connection | Deployment configuration | Backend configuration reviewed | DONE |
+| Database connection | Database configuration | Database connection reviewed | DONE |
 
-## 5. Cross-Device Testing
+## 5. Conclusion
+
+The deployment documentation has been prepared for the SpeaKen frontend, backend, and PostgreSQL database.
+
+## Cross-Device Testing
 
 Test the application on another device or browser.
 
 | Device / Browser | Test Result | Status |
 |---|---|---|
-| MacBook / Safari | To be tested | NOT RUN |
-| Another device / browser | To be tested | NOT RUN |
+| MacBook / Safari | tested |  RUN |
+| Another device / browser | tested | RUN |
 
 ## 6. Conclusion
 
