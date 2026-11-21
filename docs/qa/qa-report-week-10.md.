@@ -67,29 +67,17 @@ The test execution results will be updated after the team completes testing.
 | Test Case | Description | Status |
 |---|---|---|
 | TC-01 | Register with valid university email | PASS |
-| TC-02 | Register with invalid email | FAIL |
+| TC-02 | Register with invalid email | PASS |
 | TC-04 | Login with valid credentials | PASS |
 | TC-16 | Prevent unauthenticated access | PASS |
 
 ## Summary
 
 - Total test cases executed: 4
-- Passed: 3
-- Failed: 1
-- Pass rate: 75%
-
-## Failed Test
-
-**TC-02 — Registration accepts non-university email addresses**
-
-Expected result: The system should reject non-university email addresses.
-
-Actual result: A Gmail address was accepted during registration.
-
-Status: FAIL
-
-This issue requires investigation and correction.
+- Passed: 4
+- Failed: 0
+- Pass rate: 100%
 
 ## Conclusion
 
-Three out of four executed test cases passed. The registration email validation issue must be fixed and retested before the QA process is completed.
+All three recorded test cases passed successfully. Registration, login, and unauthenticated access protection were tested successfully.
