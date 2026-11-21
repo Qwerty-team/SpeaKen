@@ -207,3 +207,72 @@ The platform provides university students with automated, real-time AI feedback 
 * **English** levelbylevel resources - https://speecher.org/en/english/reading
 * **English** news resources - https://breakingnewsenglish.com/2609/260928-loud-music-public-transport.html
 * **English** articles resources - https://ideasinenglish.com/read/
+
+
+# Implementation Status — Final Review
+
+**Project:** SpeaKen  
+**Team:** QWERTY  
+**Review Phase:** Week 12
+
+## 1. User Story Implementation Status
+
+The following table must be completed after reviewing and testing the actual application.
+
+| ID | User Story | Priority | Implementation Status | Notes |
+|---|---|---|---|---|
+| US-01 | Student Registration | Must | To be verified | Verify registration and database saving. |
+| US-02 | Secure Login | Must | To be verified | Verify authentication and protected routes. |
+| US-03 | Profile Microphone and Audio Setup | Should | To be verified | Verify microphone test functionality. |
+| US-04 | Select Practice Topic | Must | To be verified | Verify topic loading and selection. |
+| US-05 | Record Audio Response | Must | To be verified | Verify recording and submission. |
+| US-06 | Real-time Transcript Preview | Should | To be verified | Verify transcript preview functionality. |
+| US-07 | Practice Session Playback | Should | To be verified | Verify recording playback. |
+| US-08 | Grammar and Vocabulary Scoring | Must | To be verified | Verify AI feedback. |
+| US-09 | Pronunciation Feedback | Must | To be verified | Verify pronunciation assessment. |
+| US-10 | Speaking Pace and Fluency Metrics | Should | To be verified | Verify pace and fluency metrics. |
+| US-11 | Historical Progress Dashboard | Could | To be verified | Verify historical progress visualization. |
+| US-12 | Create Speaking Assignment | Must | To be verified | Verify instructor functionality. |
+| US-13 | Student Submission Review | Should | To be verified | Verify instructor review functionality. |
+| US-14 | Manual Instructor Feedback Override | Could | To be verified | Verify instructor feedback functionality. |
+| US-15 | Export Class Analytics CSV | Won't-Have v1 | Deferred | Not included in the first release according to the original prioritization. |
+
+## 2. Status Definitions
+
+- **Done:** Feature is implemented and successfully tested.
+- **Partial:** Some functionality is implemented, but requirements are not fully satisfied.
+- **Deferred:** Feature is intentionally postponed or excluded from the current release.
+
+Do not leave "To be verified" in the final submitted version. Replace it with Done, Partial, or Deferred after testing.
+
+## 3. Non-Functional Requirements Review
+
+| ID | Requirement | Verification Method | Final Status |
+|---|---|---|---|
+| NFR-01 | Performance | Measure API response and AI feedback time. | To be verified |
+| NFR-02 | Security | Review HTTPS, token expiration and data protection. | To be verified |
+| NFR-03 | Usability and Accessibility | Test navigation, microphone setup and accessibility. | To be verified |
+| NFR-04 | Availability | Review actual hosting uptime and maintenance. | To be verified |
+| NFR-05 | Scalability | Perform or document concurrent-user load testing. | To be verified |
+
+## 4. Architecture Updates
+
+Update the architecture description and diagrams to match the implemented system.
+
+The final architecture should identify:
+
+- React and Vite frontend.
+- Node.js and Express backend.
+- PostgreSQL database.
+- Azure AI Speech integration.
+- Gemini API integration.
+
+## 5. Database and ERD Updates
+
+The database documentation must reflect the actual PostgreSQL schema.
+
+Verify the existence and structure of the implemented tables before updating the ERD.
+
+## 6. Final Review
+
+The SRS must describe the final implemented application accurately. Planned features must not be presented as completed features.
