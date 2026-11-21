@@ -221,17 +221,17 @@ The following table must be completed after reviewing and testing the actual app
 
 | ID | User Story | Priority | Implementation Status | Notes |
 |---|---|---|---|---|
-| US-01 | Student Registration | Must | To be verified | Verify registration and database saving. |
+| US-01 | Student Registration | Must | Verified | Pass registration and database saving. |
 | US-02 | Secure Login | Must | To be verified | Verify authentication and protected routes. |
-| US-03 | Profile Microphone and Audio Setup | Should | To be verified | Verify microphone test functionality. |
-| US-04 | Select Practice Topic | Must | To be verified | Verify topic loading and selection. |
+| US-03 | Profile Microphone and Audio Setup | Should | Verified | Pass microphone test functionality. |
+| US-04 | Select Practice Topic | Must | Verified | Pass topic loading and selection. |
 | US-05 | Record Audio Response | Must | To be verified | Verify recording and submission. |
 | US-06 | Real-time Transcript Preview | Should | To be verified | Verify transcript preview functionality. |
 | US-07 | Practice Session Playback | Should | To be verified | Verify recording playback. |
 | US-08 | Grammar and Vocabulary Scoring | Must | To be verified | Verify AI feedback. |
 | US-09 | Pronunciation Feedback | Must | To be verified | Verify pronunciation assessment. |
 | US-10 | Speaking Pace and Fluency Metrics | Should | To be verified | Verify pace and fluency metrics. |
-| US-11 | Historical Progress Dashboard | Could | To be verified | Verify historical progress visualization. |
+| US-11 | Historical Progress Dashboard | Could | Verified | Pass historical progress visualization. |
 | US-12 | Create Speaking Assignment | Must | To be verified | Verify instructor functionality. |
 | US-13 | Student Submission Review | Should | To be verified | Verify instructor review functionality. |
 | US-14 | Manual Instructor Feedback Override | Could | To be verified | Verify instructor feedback functionality. |
