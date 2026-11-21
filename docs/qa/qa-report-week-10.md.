@@ -1,0 +1,60 @@
+# Week 10 — Quality Assurance Report
+
+**Project:** SpeaKen  
+**Team:** QWERTY  
+**QA Coordinator:** Assel Kuanyshbaeva
+
+## 1. QA Activities
+
+During Week 10, the team prepared a QA test plan for the SpeaKen application.
+
+The test cases cover:
+
+- Student registration and authentication.
+- Practice topic selection.
+- Audio recording and submission.
+- AI grammar and vocabulary feedback.
+- Pronunciation assessment.
+- Instructor assignment functionality.
+- Authentication and protected routes.
+
+## 2. Test Execution
+
+A total of 16 test cases were prepared.
+
+Test results must be updated after execution:
+
+| Status | Count |
+|---|---:|
+| PASS | 0 |
+| FAIL | 0 |
+| BLOCKED | 0 |
+| NOT RUN | 16 |
+
+## 3. Defect Management
+
+Bugs discovered during testing are recorded as GitHub Issues.
+
+Each issue should include:
+
+- Clear description.
+- Steps to reproduce.
+- Expected and actual results.
+- Severity.
+- Responsible application area.
+- Evidence, where available.
+
+## 4. Team Responsibilities
+
+| Team Member | Responsibility |
+|---|---|
+| Assel | Coordinate testing, maintain test cases, monitor issues |
+| Kaussar | Test frontend functionality and fix UI defects |
+| Dilnaz | Test backend, authentication, API and AI integration |
+| Alsu | Validate database structure, data storage and queries |
+
+## 5. Conclusion
+
+The QA plan has been prepared to evaluate the main SpeaKen user flows and identify defects before final delivery.
+
+The test execution results will be updated after the team completes testing.
