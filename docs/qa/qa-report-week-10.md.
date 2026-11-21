@@ -58,3 +58,38 @@ Each issue should include:
 The QA plan has been prepared to evaluate the main SpeaKen user flows and identify defects before final delivery.
 
 The test execution results will be updated after the team completes testing.
+
+
+# Week 10 — QA Testing Results
+
+## Test Execution Summary
+
+| Test Case | Description | Status |
+|---|---|---|
+| TC-01 | Register with valid university email | PASS |
+| TC-02 | Register with invalid email | FAIL |
+| TC-04 | Login with valid credentials | PASS |
+| TC-16 | Prevent unauthenticated access | PASS |
+
+## Summary
+
+- Total test cases executed: 4
+- Passed: 3
+- Failed: 1
+- Pass rate: 75%
+
+## Failed Test
+
+**TC-02 — Registration accepts non-university email addresses**
+
+Expected result: The system should reject non-university email addresses.
+
+Actual result: A Gmail address was accepted during registration.
+
+Status: FAIL
+
+This issue requires investigation and correction.
+
+## Conclusion
+
+Three out of four executed test cases passed. The registration email validation issue must be fixed and retested before the QA process is completed.
