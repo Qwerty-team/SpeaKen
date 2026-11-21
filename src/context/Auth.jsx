@@ -4,8 +4,8 @@ import { api } from "@/api/client";
 const AuthContext = createContext(null);
 
 const LOCAL_ACCOUNT = {
-  email: "kadyrbaeva_k@mail.ru",
-  password: "123aaaa",
+  email: import.meta.env.VITE_LOCAL_DEMO_EMAIL || "",
+  password: import.meta.env.VITE_LOCAL_DEMO_PASSWORD || "",
 };
 const LOCAL_USER_KEY = "speaken_local_user";
 
@@ -51,17 +51,17 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     refresh();
   }, [refresh]);
-
-  // Checks email/password against the hardcoded local account above.
-  // Returns true (and logs the user in) on a match, false otherwise —
-  // Login.jsx tries this before falling back to the real backend.
   const loginLocal = useCallback((email, password) => {
-    if (email === LOCAL_ACCOUNT.email && password === LOCAL_ACCOUNT.password) {
+       if (
+      LOCAL_ACCOUNT.email &&
+      LOCAL_ACCOUNT.password &&
+      email === LOCAL_ACCOUNT.email &&
+      password === LOCAL_ACCOUNT.password
+    )  {
       const u = buildLocalUser(email);
       try {
         localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(u));
       } catch {
-        // ignore storage errors (private mode, etc.)
       }
       setUser(u);
       setLoading(false);
