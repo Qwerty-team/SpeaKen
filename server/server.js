@@ -442,6 +442,7 @@ app.post('/api/auth/register', async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 12);
 
+    /*
     const verificationToken = crypto.randomBytes(32).toString('hex');
 
     const tokenHash = crypto
@@ -502,10 +503,11 @@ app.post('/api/auth/register', async (req, res) => {
         } catch (emailError) {
           console.error('VERIFICATION EMAIL ERROR:', emailError);
         }
+        */
 
     return res.status(201).json({
       success: true,
-      message: 'Registration successful. Please check your email to verify your account.',
+      message: 'Registration successful. You can now log in.',
     });
 
   } catch (err) {
